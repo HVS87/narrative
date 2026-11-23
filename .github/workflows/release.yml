@@ -1,11 +1,16 @@
 # Aplicação para computador: ao enviar uma etiqueta vX.Y.Z, compila no Windows, no macOS e no Linux
 # e publica os instaladores na release com o mesmo nome. A versão de desktop/package.json tem de ser X.Y.Z.
+# Também se pode correr à mão (Actions › Run workflow), escolhendo os sistemas; a release é a da versão de desktop/package.json.
 name: Release (Windows, macOS, Linux)
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      systems:
+        description: 'Sistemas a compilar (windows, mac, linux)'
+        default: 'windows mac linux'
 
 permissions:
   contents: write
@@ -13,12 +18,16 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+      - id: tag
+        run: echo "tag=v$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Criar a release (se ainda não existir)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Narrative ${TAG#v}" --notes-file .github/release-notes.md
@@ -29,25 +38,33 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            target: --win nsis portable
-          - os: macos-latest
-            target: --mac dmg zip
-          - os: ubuntu-latest
-            target: --linux AppImage tar.gz
+          - name: windows
+            os: windows-latest
+            target: --win nsis portable --x64
+          - name: mac
+            os: macos-latest
+            # Intel e Apple silicon num só ficheiro (ao indicar os alvos na linha de comando, a arquitetura também tem de ir aqui)
+            target: --mac dmg zip --universal
+          - name: linux
+            os: ubuntu-latest
+            target: --linux AppImage tar.gz --x64
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: desktop
     steps:
       - uses: actions/checkout@v4
+        if: github.event_name == 'push' || contains(inputs.systems, matrix.name)
       - uses: actions/setup-node@v4
+        if: github.event_name == 'push' || contains(inputs.systems, matrix.name)
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
+        if: github.event_name == 'push' || contains(inputs.systems, matrix.name)
       - name: Compilar e publicar
+        if: github.event_name == 'push' || contains(inputs.systems, matrix.name)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
