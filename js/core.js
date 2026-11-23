@@ -145,7 +145,7 @@ function h(tag, attrs, ...kids){
   if (attrs) for (const k in attrs){ const v = attrs[k];
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') for (const p in v){ if (p.startsWith('--')) el.style.setProperty(p, v[p]); else el.style[p] = v[p]; } // também variáveis CSS (--x)
     else if (k === 'dataset') Object.assign(el.dataset, v);
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else if (k in el && k !== 'list') el[k] = v;

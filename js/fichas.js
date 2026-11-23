@@ -60,6 +60,50 @@ function refsSection(kind, id, redraw){
 }
 
 /* ---------- Scene ---------- */
+/* ----- percorrer as Cenas a partir da ficha -----
+   Par branco: a Cena anterior e a seguinte na Ordem Narrativa (a linha branca do quadro).
+   Par da cor do Arco Narrativo: a anterior e a seguinte na Ordem Cronológica do Arco (a linha colorida). Onde o Arco
+   se bifurca (um Ramo parte desta Cena, ou esta é a primeira de um Ramo) ou converge (esta Cena converge noutra, ou
+   outras convergem nela), o símbolo muda; com mais de um destino possível, o botão abre a escolha. */
+function sceneArcLinks(s){
+  const own = arcOwnScenes(s.arcId), i = own.findIndex(x => x.id === s.id), arc = arcById(s.arcId);
+  const prev = [], next = [];
+  if (i > 0) prev.push({id:own[i - 1].id, kind:'arc'});
+  else if (arc && arc.parentId && state.scenes[arc.forkSceneId]) prev.push({id:arc.forkSceneId, kind:'fork'});
+  Object.values(state.scenes).filter(x => x.convergeTo === s.id && x.arcId !== s.arcId).forEach(x => prev.push({id:x.id, kind:'merge'}));
+  if (i >= 0 && i < own.length - 1) next.push({id:own[i + 1].id, kind:'arc'});
+  state.arcs.filter(a => a.parentId === s.arcId && a.forkSceneId === s.id).forEach(a => { const f = arcOwnScenes(a.id)[0]; if (f) next.push({id:f.id, kind:'fork'}); });
+  if (s.convergeTo && state.scenes[s.convergeTo] && state.scenes[s.convergeTo].arcId !== s.arcId) next.push({id:s.convergeTo, kind:'merge'});
+  return {prev, next};
+}
+function sceneNav(s, m){
+  const order = narrOrder(), i = order.indexOf(s.id), arc = arcById(s.arcId), links = sceneArcLinks(s);
+  // a ficha é trocada pela da outra Cena, sem animação; o foco fica no mesmo botão (ou no do lado, se este já não tiver para onde ir)
+  const go = (id, k) => { if (!state.scenes[id]) return;
+    quietModals = true; try { m.close(); openSceneFicha(id); } finally { quietModals = false; }
+    const nav = [...document.querySelectorAll('.scn-nav')].pop(); if (!nav) return;
+    const b = nav.querySelector('[data-nav="' + k + '"]:not(:disabled)') || nav.querySelector('.scn-btn:not(:disabled)'); if (b) b.focus({preventScroll:true}); };
+  const label = id => { const x = state.scenes[id], a = x && arcById(x.arcId); return (x.title || _('Sem título')) + (a && a.id !== s.arcId ? ' · ' + a.name : ''); };
+  const btn = (k, icon, aria, targets, cls, style) => {
+    const b = h('button', {class:'scn-btn ' + cls, dataset:{nav:k}, style, 'aria-label':aria, disabled:!targets.length,
+      onclick:e => { if (targets.length === 1) return go(targets[0].id, k);
+        const rc = e.currentTarget.getBoundingClientRect(); showMenu(rc.left, rc.bottom + 4, targets.map(t => ({label:(t.kind === 'fork' ? '⑂ ' : t.kind === 'merge' ? '⤙ ' : '') + label(t.id), action:() => go(t.id, k)}))); }}, svgIcon(icon));
+    return b; };
+  const kindOf = (list, dir) => list.some(t => t.kind === 'fork') ? 'fork' : list.some(t => t.kind === 'merge') ? 'merge' : dir;
+  const arcIcon = (list, dir) => { const k = kindOf(list, dir); return k === 'fork' ? (dir === 'prev' ? 'forkL' : 'forkR') : k === 'merge' ? (dir === 'prev' ? 'mergeL' : 'mergeR') : (dir === 'prev' ? 'chevL' : 'chevR'); };
+  const arcAria = (list, dir) => { const k = kindOf(list, dir);
+    if (k === 'fork') return dir === 'prev' ? _('Cena anterior deste Arco Narrativo (bifurcação)') : _('Próxima Cena deste Arco Narrativo (bifurcação)');
+    if (k === 'merge') return dir === 'prev' ? _('Cena anterior deste Arco Narrativo (convergência)') : _('Próxima Cena deste Arco Narrativo (convergência)');
+    return dir === 'prev' ? _('Cena anterior deste Arco Narrativo') : _('Próxima Cena deste Arco Narrativo'); };
+  const ink = arc ? {'--arc':arcColor(arc)} : null;
+  return h('span', {class:'scn-nav', role:'group', 'aria-label':_('Percorrer as Cenas')},
+    h('span', {class:'scn-pair narr-pair'},
+      btn('narr-prev', 'chevL', _('Cena anterior na Ordem Narrativa'), i > 0 ? [{id:order[i - 1], kind:'narr'}] : [], 'narr'),
+      btn('narr-next', 'chevR', _('Próxima Cena na Ordem Narrativa'), i >= 0 && i < order.length - 1 ? [{id:order[i + 1], kind:'narr'}] : [], 'narr')),
+    h('span', {class:'scn-pair arc-pair'},
+      btn('arc-prev', arcIcon(links.prev, 'prev'), arcAria(links.prev, 'prev'), links.prev, 'arc' + (kindOf(links.prev, '') ? ' ' + kindOf(links.prev, '') : ''), ink),
+      btn('arc-next', arcIcon(links.next, 'next'), arcAria(links.next, 'next'), links.next, 'arc' + (kindOf(links.next, '') ? ' ' + kindOf(links.next, '') : ''), ink)));
+}
 function openSceneFicha(id){
   if (!state.scenes[id]) return;
   const body = h('div', {class:'ficha'});
@@ -68,7 +112,7 @@ function openSceneFicha(id){
     const s = state.scenes[id]; if (!s) return closeFicha(m);
     const arc = arcById(s.arcId), pos = findScenePos(id), nm = narrIndexMap();
     body.innerHTML = '';
-    m.titleEl.innerHTML = ''; m.titleEl.append(h('span', {class:'dot', style:{background:arcStroke(arc), width:'14px', height:'14px'}}), _('Ficha da Cena'));
+    m.titleEl.innerHTML = ''; m.titleEl.append(h('span', {class:'dot', style:{background:arcStroke(arc), width:'14px', height:'14px'}}), h('span', {class:'grow-t'}, _('Ficha da Cena')), sceneNav(s, m));
     const charInp = h('input', {class:'inp', placeholder:_('Adicionar Personagem…'), style:{width:'200px'}});
     autocomplete(charInp, () => state.characters.filter(c => !s.chars.includes(c.id)).map(c => ({id:c.id, label:c.name})),
       it => { s.chars.push(it.id); touch(); draw(); },
@@ -89,7 +133,7 @@ function openSceneFicha(id){
           h('button', {class:'chip-x', onclick:() => { s.chars = s.chars.filter(x => x !== cid); touch(); draw(); }}, '✕')); }), charInp)),
       field(_('Cenários'), sceneriesChips(s.sceneries.map(sceneryById).filter(Boolean), x => s.sceneries.includes(x.id), x => s.sceneries.push(x.id), x => { s.sceneries = s.sceneries.filter(y => y !== x.id); }, draw)),
       field(_('Posição'), h('div', {class:'posbox'},
-        h('div', null, h('b', null, _('Ordem Narrativa: ')), '#' + (nm[id] + 1) + ' de ' + Object.keys(nm).length,
+        h('div', null, h('b', null, _('Ordem Narrativa: ')), _('#{n} de {total}', {n:nm[id] + 1, total:Object.keys(nm).length}),
           pos ? h('span', {class:'muted'}, ' — ', bookDot(pos.book), _('Tomo «{tomo}» › Capítulo {c} «{cap}» › Cena {n}', {tomo:pos.book.name, c:pos.chIndex + 1, cap:pos.chapter.name, n:pos.index + 1})) : null),
         h('div', {style:{marginTop:'8px'}}, h('b', null, _('Ordem Cronológica ')), h('span', {class:'muted'}, _('em «{nome}»: ', {nome:arc.name})),
           h('input', {class:'inp', type:'number', min:1, value:s.chron, onchange:e => { const v = Math.max(1, parseInt(e.target.value, 10) || 1); s.chron = v; normalizeChron(s.arcId); touch(); draw(); }}),

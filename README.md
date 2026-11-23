@@ -7,11 +7,11 @@
 A free, non-profit tool to **build, map and rearrange stories**: Books, Chapters, Scenes and Story Arcs on one board, with details panels for Characters, Sceneries, Notes and References, a writing schedule, and a Writing Guide for each language.
 
 **Open Narrative:** <https://hvs87.github.io/narrative/>
-**Windows app:** [releases page](https://github.com/HVS87/narrative/releases/latest)
+**Desktop app (Windows, macOS, Linux):** [releases page](https://github.com/HVS87/narrative/releases/latest)
 
 Available in **English, Português, Español and Français**. The first time it opens, Narrative follows your operating system's language; you can change it in Settings, and the choice is remembered.
 
-> **Privacy.** Narrative is free and non-profit. All your data is stored locally on your computer or device; the app collects no data and no analytics. There are no accounts, ads or third-party cookies. If you choose to sync two devices, the project travels encrypted directly from one to the other.
+> **Privacy.** Narrative is free and non-profit. All your data is stored only on your computer or device; the app collects no data and no analytics. There are no accounts, ads or third-party cookies. If you choose to sync two devices, the project travels encrypted directly from one to the other.
 
 ![The board: Books as columns, Story Arcs as lanes](icons/screenshot-wide.png)
 
@@ -41,6 +41,8 @@ Available in **English, Português, Español and Français**. The first time it 
 | Where | How |
 |---|---|
 | **Windows** | Download the **installer** or the **portable** app from the [releases page](https://github.com/HVS87/narrative/releases/latest). The files are not code-signed, so the first time Windows shows a warning: "More info" › "Run anyway". |
+| **macOS** (Intel and Apple silicon) | Download the `.dmg` from the [releases page](https://github.com/HVS87/narrative/releases/latest) and drag Narrative to Applications. It is not signed: the first time, right-click the app › "Open". |
+| **Linux** | Download the `.AppImage` from the [releases page](https://github.com/HVS87/narrative/releases/latest), make it executable (`chmod +x`) and run it; a `.tar.gz` is also available. |
 | **Chrome or Edge (Windows, macOS, Linux)** | Open the address and choose "Install Narrative" in the ⋮ menu or the address bar. |
 | **Android** | In Chrome: ⋮ › "Install app" or "Add to Home screen". |
 | **iPhone and iPad** | In Safari: Share › "Add to Home Screen". |
@@ -59,7 +61,8 @@ js/apoio-*.js               Writing Guide (Portuguese: apoio-pt-0, apoio-a…i; 
 js/vendor/peerjs.min.js     sync library (PeerJS 1.5.4, MIT licence)
 js/version.js               published version — the only thing to change for each release
 sw.js, manifest.webmanifest installable app and offline use
-desktop/                    Windows app (Electron)
+desktop/                    desktop app for Windows, macOS and Linux (Electron)
+.github/workflows/          builds and publishes the desktop app when a vX.Y.Z tag is pushed
 qa/                         tests
 ```
 
@@ -73,12 +76,12 @@ node qa/pwa.js                       # install on PC and phone, offline use, aut
 node qa/desktop.js                   # Windows app + simulated phone: pairing and sync
 ```
 
-**Windows app:**
+**Desktop app:** pushing a tag `vX.Y.Z` (matching `desktop/package.json`) makes GitHub Actions build the Windows, macOS and Linux apps and attach them to the release. To build locally:
 
 ```
 cd desktop
 npm install
-npx electron-builder --win nsis portable --publish never   # builds desktop/dist/
+npx electron-builder --publish never   # builds desktop/dist/ for the current system
 ```
 
-**Publishing a new version:** change the number in `js/version.js` (and in `desktop/package.json` for a new Windows app) and push to GitHub; the site and installed apps update themselves.
+**Publishing a new version:** change the number in `js/version.js` (and in `desktop/package.json`, then push a `vX.Y.Z` tag, for a new desktop app) and push to GitHub; the site and installed apps update themselves.

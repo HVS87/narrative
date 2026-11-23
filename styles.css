@@ -725,3 +725,20 @@ body.ul-links a,body.ul-links .linkish{text-decoration:underline;text-underline-
 #langBtn{display:none;font-size:12.5px;font-weight:700;letter-spacing:.5px;width:auto;min-width:38px;padding:0 8px;border:1.5px solid var(--border);border-radius:10px;height:32px;margin-right:4px}
 body.no-project #langBtn{display:inline-flex;align-items:center;justify-content:center}
 .lang-menu .ctx-item{font-variant-numeric:tabular-nums}
+/* ficha da Cena: percorrer as Cenas — par branco (Ordem Narrativa) e par da cor do Arco Narrativo (Ordem Cronológica) */
+.modal-title:has(.scn-nav){flex:1;flex-wrap:wrap;row-gap:6px}
+.modal-title .grow-t{min-width:0}
+.scn-nav{display:inline-flex;align-items:center;gap:10px;margin-left:auto;margin-right:4px}
+.scn-pair{display:inline-flex;gap:4px}
+.scn-btn{width:32px;height:32px;border-radius:50%;border:0;padding:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:filter .15s,transform .15s,box-shadow .15s;color:#15171c}
+.scn-btn .nic svg{width:20px;height:20px;stroke-width:2.2}
+.scn-btn.narr{background:var(--narr);box-shadow:inset 0 0 0 1.5px var(--border-strong)}
+.scn-btn.arc{background:var(--arc,#999)}
+.scn-btn:hover:not(:disabled){filter:brightness(.92);box-shadow:0 1px 4px var(--shadow)}
+.scn-btn.narr:hover:not(:disabled){box-shadow:inset 0 0 0 1.5px var(--border-strong),0 1px 4px var(--shadow)}
+.scn-btn:active:not(:disabled){transform:scale(.94)}
+.scn-btn:disabled{opacity:.28;cursor:default}
+.scn-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* bifurcação e convergência: além do símbolo, um anel à volta (não depende só da cor) */
+.scn-btn.fork,.scn-btn.merge{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--arc,#999)}
+@media (max-width:420px){ .scn-btn{width:30px;height:30px} .scn-nav{gap:6px} }

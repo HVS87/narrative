@@ -731,6 +731,17 @@ window.__qa = (async () => {
         const bad = await Promise.race([fr.contentWindow.eval(SCAN), W(60000).then(() => ['a medição não terminou em 60 s'])]); eq(bad.slice(0, 12), []); }
       finally { fr.remove(); localStorage.setItem(LS_KEY, saved); } });
 
+  /* as outras línguas têm textos mais compridos: a mesma medição, no telemóvel ao alto e deitado e no PC, com a barra de baixo e a lateral inteiras */
+  for (const l of ['en', 'es', 'fr']) for (const [w, hh] of [[390, 800], [740, 360], [1280, 800]])
+    await T('M13 em ' + l.toUpperCase() + ' ' + w + '×' + hh + ': textos dentro das caixas e rótulos da navegação inteiros', async () => { flushSave(); const saved = localStorage.getItem(LS_KEY);
+      localStorage.setItem(LS_LANG, l); const fr = h('iframe', {src:location.pathname, style:{position:'fixed', left:'0', top:'0', width:w + 'px', height:hh + 'px', border:'0', opacity:'0', pointerEvents:'none', zIndex:'-1'}}); document.body.append(fr);
+      try { await new Promise((res, rej) => { fr.onload = res; setTimeout(() => rej(new Error('a janela de teste não carregou')), 8000); }); localStorage.setItem(LS_LANG, 'pt'); await W(150);
+        const cw = fr.contentWindow; eq(cw.eval('LANG'), l); eq(cw.document.documentElement.lang.slice(0, 2), l);
+        const cut = [...cw.document.querySelectorAll('#rail .nav-label, #bnav .nav-label, .rail-cap')].filter(e => e.getClientRects().length && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent);
+        eq(cut, [], 'rótulos cortados');
+        const bad = await Promise.race([cw.eval(SCAN), W(60000).then(() => ['a medição não terminou em 60 s'])]); eq(bad.slice(0, 12), []); }
+      finally { localStorage.setItem(LS_LANG, 'pt'); fr.remove(); localStorage.setItem(LS_KEY, saved); } });
+
   /* ---- N: defeitos encontrados na revisão do toque, do duplo ecrã e da sincronização ---- */
   await T('N01 toque longo e largar abre sempre o menu, em qualquer ponto de qualquer Cena, Capítulo ou Tomo', async () => { const f = fx(); const miss = [];
     const tryAt = async (get, frac, want) => { const el = get(), rc = el.getBoundingClientRect(), x = rc.left + rc.width * frac, y = rc.top + rc.height / 2;
@@ -1362,7 +1373,7 @@ window.__qa = (async () => {
   await T('Q04 aviso de privacidade: na primeira abertura e sempre no fim das Definições', async () => {
     localStorage.removeItem(LS_PRIV); welcomeIfNeeded(); await W(30);
     ok(topModal() && topModal().textContent.includes('Bem-vindo ao Narrative') && topModal().textContent.includes('gratuita e sem fins lucrativos'));
-    ok(topModal().textContent.includes(onPhoneOrTablet() ? 'no seu aparelho' : 'no seu computador') && topModal().textContent.includes('não recolhe nenhuns dados nem analytics'));
+    ok(topModal().textContent.includes(onPhoneOrTablet() ? 'unicamente gravados no seu aparelho' : 'unicamente gravados no seu computador') && topModal().textContent.includes('encriptado') && topModal().textContent.includes('não recolhe nenhuns dados nem analytics'));
     eq([...topModal().querySelectorAll('.lang-seg button')].map(b => b.textContent), ['Português', 'English', 'Español', 'Français']);
     btn('Começar').click(); await W(20); eq(modals().length, 0); eq(lsGet(LS_PRIV), '1'); welcomeIfNeeded(); await W(20); eq(modals().length, 0, 'só uma vez');
     setTab('settings'); await W(20); const cards = [...$('#view-page .settings').children]; ok(cards[cards.length - 1].classList.contains('privacy-card'), 'o aviso é o último cartão');
@@ -1391,6 +1402,21 @@ window.__qa = (async () => {
       setA11y('contrast', true); ok(document.body.classList.contains('hc')); eq(getComputedStyle(document.body).getPropertyValue('--muted').trim(), getComputedStyle(document.body).getPropertyValue('--text').trim());
     } finally { lsSet(LS_A11Y, '{}'); applyA11y(); }
     eq(document.body.dataset.fs, 'm'); const f = fx(); f.A.hue = 10; f.A.sat = 72; commit(); recolorArcs(); commit(); eq([f.A.hue, f.A.sat], ARC_TONES[0]); undo(); eq([arcById(f.A.id).hue, arcById(f.A.id).sat], [10, 72]); });
+  await T('Q08 ficha da Cena: «<» «>» pela Ordem Narrativa (branco) e pelo Arco Narrativo (cor do Arco), com bifurcação e convergência', async () => {
+    state = demoProject(); state.scenes.s7.convergeTo = 's9'; commit(); renderAll(); closeAllModals();
+    const nav = id => { openSceneFicha(id); const r = {}; topModal().querySelectorAll('.scn-btn').forEach(b => r[b.dataset.nav] = (b.disabled ? '-' : '') + (b.classList.contains('fork') ? 'fork' : b.classList.contains('merge') ? 'merge' : 'ok')); closeAllModals(); return r; };
+    eq(nav('s1'), {'narr-prev':'-ok', 'narr-next':'ok', 'arc-prev':'-ok', 'arc-next':'ok'});
+    eq(nav('s2')['arc-next'], 'fork'); eq(nav('s4')['arc-prev'], 'fork'); eq(nav('s7')['arc-next'], 'merge'); eq(nav('s9')['arc-prev'], 'merge'); eq(nav('s9')['arc-next'], '-ok');
+    openSceneFicha('s2'); const b = topModal().querySelector('[data-nav="arc-prev"]'); eq(getComputedStyle(b).backgroundColor, (() => { const d = h('span', {style:{color:arcColor(arcById('a1'))}}); document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; })(), 'da cor do Arco');
+    ok(getComputedStyle(topModal().querySelector('[data-nav="narr-next"]')).backgroundColor === 'rgb(255, 255, 255)', 'o par da Ordem Narrativa é branco');
+    topModal().querySelectorAll('.scn-btn').forEach(x => ok(tipFor(x) && x.getAttribute('aria-label'), 'sem explicador'));
+    const order = narrOrder(); topModal().querySelector('[data-nav="narr-next"]').click(); await W(30);
+    eq(modals().length, 1); eq(topModal().querySelector('input').value, state.scenes[order[order.indexOf('s2') + 1]].title); eq(document.activeElement.dataset.nav, 'narr-next', 'o foco fica no botão');
+    closeAllModals(); openSceneFicha('s2'); topModal().querySelector('[data-nav="arc-next"]').click(); await W(20); eq(menuLabels().length, 2, 'bifurcação: escolher o caminho');
+    document.querySelectorAll('.ctx-item')[1].click(); await W(30); eq(topModal().querySelector('input').value, state.scenes.s4.title, 'segue o Ramo');
+    topModal().querySelector('[data-nav="arc-prev"]').click(); await W(30); eq(topModal().querySelector('input').value, state.scenes.s2.title, 'volta à Cena da bifurcação');
+    closeAllModals(); openSceneFicha('s7'); topModal().querySelector('[data-nav="arc-next"]').click(); await W(30); eq(topModal().querySelector('input').value, state.scenes.s9.title, 'convergência');
+    closeAllModals(); fx(); });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };

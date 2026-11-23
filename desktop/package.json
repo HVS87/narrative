@@ -2,14 +2,14 @@
   "name": "narrative",
   "productName": "Narrative",
   "version": "1.0.0",
-  "description": "Narrative: build, map and rearrange stories — Books, Chapters, Scenes and Story Arcs.",
+  "description": "Narrative: a free, private tool to build, map and rearrange stories.",
   "author": "Narrative",
   "license": "UNLICENSED",
   "main": "main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis portable --publish never"
+    "dist": "electron-builder --publish never"
   },
   "devDependencies": {
     "electron": "33.2.1",
@@ -50,13 +50,53 @@
         "es_ES",
         "fr_FR"
       ],
-      "artifactName": "Narrative-${version}-setup.${ext}"
+      "artifactName": "Narrative-${version}-windows-setup.${ext}"
     },
     "portable": {
-      "artifactName": "Narrative-${version}-portable.${ext}"
+      "artifactName": "Narrative-${version}-windows-portable.${ext}"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "artifactName": "Narrative-${version}-mac.${ext}"
+    },
+    "dmg": {
+      "title": "Narrative ${version}"
+    },
+    "linux": {
+      "category": "Office",
+      "icon": "build/icon.png",
+      "synopsis": "Build, map and rearrange stories",
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ],
+      "artifactName": "Narrative-${version}-linux-${arch}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "HVS87",
+      "repo": "narrative",
+      "releaseType": "release"
     }
   },
   "allowScripts": {
     "electron@33.2.1": true
-  }
+  },
+  "homepage": "https://hvs87.github.io/narrative/"
 }

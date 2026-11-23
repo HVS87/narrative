@@ -1,5 +1,5 @@
 'use strict';
-/* Narrative para PC (Windows).
+/* Narrative para computador (Windows, macOS e Linux).
    A janela abre a ferramenta publicada no site: assim recebe as atualizações automaticamente (o mecanismo de atualização
    da própria ferramenta trata disso) e funciona sem internet a partir da cópia guardada pelo service worker.
    Os projetos ficam gravados neste computador, nos dados da aplicação. */
@@ -12,11 +12,11 @@ const ORIGIN = new URL(APP_URL).origin;
 const BASE = new URL(APP_URL).href;
 const STATE_FILE = () => path.join(app.getPath('userData'), 'janela.json');
 /* para testes automáticos: uma pasta de dados descartável, que não toca nos projetos reais.
-   Fora disso, a pasta de dados continua a ser a da «Ferramenta Narrativa» (o nome antigo): quem já usava a aplicação mantém os projetos. */
+   Fora disso, se já existir a pasta de dados da «Ferramenta Narrativa» (o nome antigo), continua a ser essa: quem já usava a aplicação mantém os projetos. */
 if (process.env.NARRATIVA_USERDATA) app.setPath('userData', process.env.NARRATIVA_USERDATA);
-else app.setPath('userData', path.join(app.getPath('appData'), 'Ferramenta Narrativa'));
+else { const old = path.join(app.getPath('appData'), 'Ferramenta Narrativa'); if (fs.existsSync(old)) app.setPath('userData', old); }
 
-/* os poucos textos do próprio programa, na língua do Windows */
+/* os poucos textos do próprio programa, na língua do sistema */
 const T = {
   pt:{quit:'Sair sem guardar', cancel:'Cancelar', msg:'Há projetos com alterações que não foram guardadas em ficheiro.', detail:'O trabalho continua gravado neste computador e volta a aparecer quando abrir a aplicação; só o ficheiro guardado (com «Guardar Projeto») não terá estas alterações.'},
   en:{quit:'Quit without saving', cancel:'Cancel', msg:'Some projects have changes that were not saved to a file.', detail:'Your work stays stored on this computer and will be there when you open the app again; only the saved file (from “Save Project”) will not have these changes.'},
@@ -73,7 +73,8 @@ function createWindow(){
 }
 
 app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
+  // no macOS, o menu da aplicação é o que dá Copiar, Colar, Anular e Sair (⌘C, ⌘V, ⌘Z, ⌘Q); no Windows e no Linux não há menu
+  Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([{role:'appMenu'}, {role:'editMenu'}, {role:'windowMenu'}]) : null);
   try { const av = session.defaultSession.availableSpellCheckerLanguages || []; const want = [app.getLocale(), 'pt-PT', 'en-US', 'es-ES', 'fr-FR'].filter((l, i, a) => av.includes(l) && a.indexOf(l) === i); if (want.length) session.defaultSession.setSpellCheckerLanguages(want); } catch(e){}
   // só se pedem as permissões de que a ferramenta precisa (nenhuma de câmara, microfone ou localização)
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(['clipboard-sanitized-write', 'fullscreen', 'window-management', 'fileSystem'].includes(perm)));

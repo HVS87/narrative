@@ -251,9 +251,9 @@ function installCard(){
       : mobile ? _('No Chrome para Android: menu ⋮ › «Adicionar ao ecrã principal» ou «Instalar aplicação».')
       : _('No Chrome ou no Edge: menu ⋮ › «Instalar Narrative» (ou o ícone de instalação na barra de endereço). No Safari: Partilhar › «Adicionar à Dock».')));
   }
-  // no Windows, fora da aplicação para PC: ligação para o instalador e o executável portátil
-  if (!isDesktopApp() && /Windows/.test(ua) && !mobile) kids.push(h('p', {class:'small', dataset:{install:'pc'}}, _('Também há uma aplicação para PC (Windows), com instalador ou em executável portátil: '),
-    h('a', {href:'https://github.com/HVS87/narrative/releases/latest', target:'_blank', rel:'noopener'}, _('descarregar a aplicação para PC')), '.'));
+  // no computador, fora da aplicação: ligação para as versões de Windows, macOS e Linux
+  if (!isDesktopApp() && /Windows|Macintosh|Linux|X11/.test(ua) && !mobile) kids.push(h('p', {class:'small', dataset:{install:'pc'}}, _('Também há uma aplicação para computador (Windows, macOS e Linux): '),
+    h('a', {href:'https://github.com/HVS87/narrative/releases/latest', target:'_blank', rel:'noopener'}, _('descarregar a aplicação para computador')), '.'));
   return h('div', {class:'card static install-card'}, kids);
 }
 function initApp(){

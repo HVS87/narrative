@@ -6,9 +6,9 @@
 const LS_PRIV = 'narrativa.privacySeen';
 const onPhoneOrTablet = () => /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
 const privacyText = () => onPhoneOrTablet()
-  ? _('Esta é uma ferramenta gratuita e sem fins lucrativos. Todos os dados são gravados localmente no seu aparelho; esta aplicação não recolhe nenhuns dados nem analytics.')
-  : _('Esta é uma ferramenta gratuita e sem fins lucrativos. Todos os dados são gravados localmente no seu computador; esta aplicação não recolhe nenhuns dados nem analytics.');
-const privacyDetail = () => _('Não há contas, publicidade, cookies de terceiros nem estatísticas de utilização. Se ligar dois dispositivos em «Sincronizar dispositivos», o projeto passa cifrado diretamente de um para o outro, e o serviço que os põe em contacto não o consegue ler.');
+  ? _('Esta é uma ferramenta gratuita e sem fins lucrativos. Todos os dados são unicamente gravados no seu aparelho; esta aplicação não recolhe nenhuns dados nem analytics.')
+  : _('Esta é uma ferramenta gratuita e sem fins lucrativos. Todos os dados são unicamente gravados no seu computador; esta aplicação não recolhe nenhuns dados nem analytics.');
+const privacyDetail = () => _('Não há contas, publicidade, cookies de terceiros nem estatísticas de utilização. Se ligar dois dispositivos em «Sincronizar dispositivos», o projeto passa encriptado diretamente de um para o outro, e o serviço que os põe em contacto não o consegue ler.');
 function privacyCard(){
   return h('div', {class:'card static privacy-card', role:'note'}, h('h3', null, svgIcon('shield'), _('Privacidade')),
     h('p', {class:'privacy-main'}, privacyText()), h('p', {class:'muted small'}, privacyDetail()));

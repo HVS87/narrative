@@ -63,7 +63,10 @@ const kill = p => { try { execSync(`taskkill /PID ${p.pid} /T /F`, {stdio:'ignor
     await until(pc, `typeof state === 'object' && typeof Projects === 'object'`);
     check('o .exe abre a ferramenta', await pc.ev(`!!document.querySelector('#topbar')`));
     check('a ferramenta sabe que está na aplicação para PC', await pc.ev(`isDesktopApp() && isInstalledApp() && /^\\d+\\.\\d+\\.\\d+$/.test(window.narrativaDesktop.version)`), await pc.ev(`window.narrativaDesktop && window.narrativaDesktop.version`));
-    await pc.ev(`lsSet(LS_TOUR, '1'); lsSet(LS_PRIV, '1'); closeAllModals(); 1`);
+    check('na primeira abertura, segue a língua do sistema', await pc.ev(`LANG === detectLang()`), await pc.ev(`LANG`));
+    // o resto do teste procura textos em português: fixa a língua e recarrega
+    await pc.ev(`lsSet(LS_TOUR, '1'); lsSet(LS_PRIV, '1'); localStorage.setItem(LS_LANG, 'pt'); Projects.leaving = true; setTimeout(() => location.reload(), 50); 1`);
+    await W(1500); pc.close(); pc = await connect(9351); await until(pc, `typeof state === 'object' && typeof Projects === 'object' && LANG === 'pt'`);
     check('primeira abertura sem projetos: página inicial', await pc.ev(`projNone() && !document.querySelector('#landing').hidden`));
     await pc.ev(`newProject(); state.project.name = 'Romance do PC'; state.books[0].name = 'Livro um'; commit(); flushSave(); setTab('settings'); 1`);
     check('Definições: «Está a usar a aplicação para PC»', await pc.ev(`!!document.querySelector('[data-install="desktop"]')`));
@@ -74,7 +77,9 @@ const kill = p => { try { execSync(`taskkill /PID ${p.pid} /T /F`, {stdio:'ignor
     await phone.send('Emulation.setDeviceMetricsOverride', {width:412, height:915, deviceScaleFactor:2.6, mobile:true});
     await phone.send('Emulation.setTouchEmulationEnabled', {enabled:true, maxTouchPoints:5});
     await until(phone, `typeof state === 'object' && typeof Projects === 'object'`);
-    await phone.ev(`lsSet(LS_TOUR, '1'); lsSet(LS_PRIV, '1'); closeAllModals(); Sync.cfg.name = 'Telemóvel de teste'; syncSave(); 1`);
+    await phone.ev(`lsSet(LS_TOUR, '1'); lsSet(LS_PRIV, '1'); localStorage.setItem(LS_LANG, 'pt'); Projects.leaving = true; setTimeout(() => location.reload(), 50); 1`);
+    await W(1500); phone.close(); phone = await connect(9352); await until(phone, `typeof state === 'object' && typeof Projects === 'object' && LANG === 'pt'`);
+    await phone.ev(`closeAllModals(); Sync.cfg.name = 'Telemóvel de teste'; syncSave(); 1`);
 
     console.log('Emparelhar e sincronizar');
     const code = await pc.ev(`(async () => { syncPairShow(); for (let i = 0; i < 60; i++){ const m = openModals.find(x => x.pairCode); const st = m && m.back.querySelector('[role=status]'); if (st && /espera/.test(st.textContent)) return m.pairCode; await new Promise(r => setTimeout(r, 500)); } return null; })()`);

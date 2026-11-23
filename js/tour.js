@@ -63,7 +63,7 @@ const TOUR_STEPS = [
     text:_('A última Cena de cada Arco Narrativo tem uma pequena bola na margem direita: arraste-a até uma Cena de outro Arco Narrativo — em qualquer Capítulo ou Tomo — e o Arco Narrativo passa a convergir nela, após confirmação. Também funciona com um clique longo do botão direito. Em alternativa, escolha «Criar convergência…» no menu da Cena e indique a Cena de destino.'),
     sim:tk => simLink(tk, 's7', 's9') },
   { sel:'.modal', title:_('Ficha da Cena'), setup:() => openSceneFicha('s2'),
-    text:_('Título, resumo, Arco Narrativo (nunca em branco), POV, Personagens, Cenários, posição na Ordem Narrativa e na Ordem Cronológica, e ainda Notas e Referências associadas.') },
+    text:_('Título, resumo, Arco Narrativo (nunca em branco), POV, Personagens, Cenários, posição na Ordem Narrativa e na Ordem Cronológica, e ainda Notas e Referências associadas. No topo, os botões redondos «<» e «>» levam à Cena anterior e à seguinte: os brancos pela Ordem Narrativa, os da cor do Arco Narrativo pelo próprio Arco — e mudam de símbolo onde ele se bifurca ou converge.') },
   { sel:'.modal', title:_('Ficha do Tomo'), setup:() => openBookFicha('b1'),
     text:_('Nome, cor do Tomo (que o distingue no quadro e nas listas), tipo de narrador (com ligação aos Materiais de Apoio) e a lista automática de Personagens: primeiro as Personagens Principais, depois as Secundárias, com POV, género e idade. «Marcar como principal» só afeta este Tomo.') },
   { sel:'#view-page', tab:'plan', title:_('Calendarização e Objetivos'),
