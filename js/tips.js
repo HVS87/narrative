@@ -251,10 +251,10 @@ const TIP_RULES = [
     'narr-prev':_('A Cena que vem antes desta no livro, pela linha branca. Tecla ←.'),
     'narr-next':_('A Cena que vem a seguir a esta no livro, pela linha branca. Tecla →.'),
     'arc-prev':el.classList.contains('fork') ? _('Esta Cena abre um Ramo: a seta volta à Cena de onde o Ramo parte. Teclas Shift + ←.')
-      : el.classList.contains('merge') ? _('Há Arcos Narrativos que convergem nesta Cena: a seta segue pela linha deste Arco e as Cenas de onde os outros vêm estão na fita. Teclas Shift + ←.')
+      : el.classList.contains('merge') ? _('Há Arcos Narrativos que convergem nesta Cena: a seta abre a escolha de onde vir. Teclas Shift + ←.')
       : _('A Cena anterior deste Arco Narrativo, pela linha da cor do Arco. Teclas Shift + ←.'),
-    'arc-next':el.classList.contains('fork') ? _('O Arco Narrativo bifurca-se aqui: a seta segue em frente e a Cena do Ramo está na fita, por baixo. Teclas Shift + →.')
-      : el.classList.contains('merge') ? _('Este Arco Narrativo converge noutro: a seta leva à Cena onde se junta. Teclas Shift + →.')
+    'arc-next':el.classList.contains('fork') ? _('O Arco Narrativo bifurca-se aqui: a seta abre a escolha entre continuar neste Arco ou seguir o Ramo. Teclas Shift + →.')
+      : el.classList.contains('merge') ? _('Este Arco Narrativo converge noutro: a seta leva à Cena onde se junta, ou abre a escolha se o Arco também continua. Teclas Shift + →.')
       : _('A Cena seguinte deste Arco Narrativo, pela linha da cor do Arco. Teclas Shift + →.')})[el.dataset.nav]],
   ['.ft-node', el => el.dataset.name, el => el.dataset.rel],
   ['.lang-seg button', _('Língua'), _('Muda a língua da ferramenta e dos Materiais de Apoio neste dispositivo. A página recarrega; os projetos não mudam.')],

@@ -66,8 +66,8 @@ function refsSection(kind, id, redraw){
    acaba nas caixas dessas Cenas; onde o Arco se bifurca ou converge, a linha divide-se ou junta-se e aparecem as Cenas
    de cada caminho, cada uma na cor do seu Arco. Clicar numa Cena da fita leva a essa Cena.
    As setas — brancas para o livro, da cor do Arco para o Arco — ficam fora da ficha, a meio da altura, sempre no mesmo
-   sítio; sem margem para elas, ficam nas pontas de cada linha da fita. Uma seta segue em frente; numa bifurcação ou
-   convergência mostra o símbolo e mistura as cores dos Arcos. ← e → fazem o mesmo que as brancas; com Shift, as do Arco. */
+   sítio; sem margem para elas, ficam nas pontas de cada linha da fita. Com um só caminho, a seta vai direta; numa
+   bifurcação ou convergência mostra o símbolo, mistura as cores dos Arcos e abre a escolha do caminho. ← e → fazem o mesmo que as brancas; com Shift, as do Arco. */
 function sceneArcLinks(s){
   const own = arcOwnScenes(s.arcId), i = own.findIndex(x => x.id === s.id), arc = arcById(s.arcId);
   const prev = [], next = [];
@@ -155,15 +155,19 @@ function openSceneFicha(id){
     if (f) f.focus({preventScroll:true});
     return true;
   };
-  /* uma Cena da fita leva a essa Cena; uma seta segue em frente pela linha — e só pergunta quando há vários caminhos e nenhum é em frente */
+  /* uma Cena da fita leva a essa Cena; uma seta com um só caminho vai direta, e numa bifurcação ou convergência abre a
+     escolha: primeiro o caminho deste Arco, depois os dos outros, cada um com o nome do seu Arco */
   const act = (k, anchor, quick) => {
     const t = to[k]; if (!t) return false;
     if (t.id) return go(t.id, k, t.dir, quick);
-    const ahead = t.list.length === 1 ? t.list[0] : t.list.find(x => x.kind === 'arc' || x.kind === 'narr');
-    if (ahead) return go(ahead.id, k, t.dir, quick);
-    if (!t.list.length || !anchor) return false;
+    if (!t.list.length) return false;
+    if (t.list.length === 1) return go(t.list[0].id, k, t.dir, quick);
+    if (!anchor) return false;
     const rc = anchor.getBoundingClientRect(), lab = x => { const sc = state.scenes[x.id], y = arcById(sc.arcId); return (sc.title || _('Sem título')) + (y ? ' · ' + y.name : ''); };
-    showMenu(rc.left, rc.bottom + 4, t.list.map(x => ({label:lab(x), action:() => go(x.id, k, t.dir)}))); return true;
+    const list = [...t.list].sort((a, b) => (a.kind === 'arc' ? 0 : 1) - (b.kind === 'arc' ? 0 : 1));
+    showMenu(rc.left, rc.bottom + 4, list.map(x => ({label:lab(x), action:() => go(x.id, k, t.dir)})));
+    const first = document.querySelector('.ctx-menu .ctx-item:not(:disabled)'); if (first) first.focus({preventScroll:true}); // pelo teclado, escolhe-se logo com ↑ ↓ e Enter
+    return true;
   };
   box.addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (b && !b.disabled) act(b.dataset.nav, b); }); // as Cenas da fita e as setas
   box.addEventListener('animationend', e => { if (e.target === box) box.classList.remove('slide-next', 'slide-prev'); });
