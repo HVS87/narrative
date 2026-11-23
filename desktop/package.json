@@ -1,0 +1,62 @@
+{
+  "name": "narrative",
+  "productName": "Narrative",
+  "version": "1.0.0",
+  "description": "Narrative: build, map and rearrange stories — Books, Chapters, Scenes and Story Arcs.",
+  "author": "Narrative",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "app.narrative.desktop",
+    "productName": "Narrative",
+    "copyright": "Narrative",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "offline.html",
+      "icon.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Narrative",
+      "installerLanguages": [
+        "en_US",
+        "pt_PT",
+        "es_ES",
+        "fr_FR"
+      ],
+      "artifactName": "Narrative-${version}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "Narrative-${version}-portable.${ext}"
+    }
+  },
+  "allowScripts": {
+    "electron@33.2.1": true
+  }
+}

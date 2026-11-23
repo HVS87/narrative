@@ -1,0 +1,29 @@
+{
+  "id": "./",
+  "name": "Narrative",
+  "short_name": "Narrative",
+  "description": "Build, map and rearrange stories: Books, Chapters, Scenes and Story Arcs. Free, offline, and private: your data stays on your device.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#161b2a",
+  "theme_color": "#161b2a",
+  "categories": [
+    "productivity",
+    "books",
+    "education"
+  ],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "screenshots": [
+    { "src": "icons/screenshot-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "The board: Books as columns, Story Arcs as lanes" },
+    { "src": "icons/screenshot-narrow.png", "sizes": "540x1170", "type": "image/png", "form_factor": "narrow", "label": "The board on a phone" }
+  ]
+}

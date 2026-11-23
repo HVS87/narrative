@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Narrative</title>
+<style>
+  html,body{margin:0;height:100%;background:#161b2a;color:#eceef2;font-family:"Segoe UI",system-ui,sans-serif}
+  body{display:grid;place-items:center;text-align:center;padding:24px;box-sizing:border-box}
+  h1{font-size:24px;margin:16px 0 8px;font-weight:600}
+  p{color:#b9c0cc;max-width:460px;line-height:1.5;margin:0 auto 18px}
+  button{font:inherit;font-weight:600;padding:10px 22px;border-radius:10px;border:0;background:#8ab4f8;color:#10131d;cursor:pointer}
+  svg{width:72px;height:72px}
+</style>
+</head>
+<body>
+<main>
+  <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#1d2438"/><path d="M9 19h46" stroke="#6cb8ee" stroke-width="4" stroke-linecap="round" opacity=".5"/><path d="M9 45h46" stroke="#f2a65e" stroke-width="4" stroke-linecap="round" opacity=".5"/><rect x="11" y="11" width="16" height="16" rx="5" fill="#6cb8ee"/><rect x="37" y="11" width="16" height="16" rx="5" fill="#6cb8ee"/><rect x="11" y="37" width="16" height="16" rx="5" fill="#f2a65e"/><rect x="37" y="37" width="16" height="16" rx="5" fill="#f2a65e"/><path d="M19 45V19l26 26V19" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <h1 id="t">No internet connection</h1>
+  <p id="d">The first time it opens, Narrative needs the internet to download itself. After that, it also works offline.</p>
+  <button id="b" onclick="location.href = 'https://hvs87.github.io/narrative/'">Try again</button>
+  <script>
+    const T = { pt:['Sem ligação à internet', 'Na primeira abertura, o Narrative precisa de internet para se descarregar. A partir daí, funciona também sem ligação.', 'Tentar outra vez'],
+      es:['Sin conexión a internet', 'La primera vez que se abre, Narrative necesita internet para descargarse. A partir de ahí, también funciona sin conexión.', 'Reintentar'],
+      fr:['Pas de connexion internet', 'À la première ouverture, Narrative a besoin d’internet pour se télécharger. Ensuite, il fonctionne aussi hors connexion.', 'Réessayer'] };
+    let l = ''; try { l = localStorage.getItem('narrativa.lang') || ''; } catch(e){}
+    const v = T[l] || T[(navigator.language || '').slice(0, 2)];
+    if (v){ document.documentElement.lang = l || navigator.language; t.textContent = v[0]; d.textContent = v[1]; b.textContent = v[2]; }
+  </script>
+</main>
+</body>
+</html>
