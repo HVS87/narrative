@@ -1402,21 +1402,69 @@ window.__qa = (async () => {
       setA11y('contrast', true); ok(document.body.classList.contains('hc')); eq(getComputedStyle(document.body).getPropertyValue('--muted').trim(), getComputedStyle(document.body).getPropertyValue('--text').trim());
     } finally { lsSet(LS_A11Y, '{}'); applyA11y(); }
     eq(document.body.dataset.fs, 'm'); const f = fx(); f.A.hue = 10; f.A.sat = 72; commit(); recolorArcs(); commit(); eq([f.A.hue, f.A.sat], ARC_TONES[0]); undo(); eq([arcById(f.A.id).hue, arcById(f.A.id).sat], [10, 72]); });
-  await T('Q08 ficha da Cena: «<» «>» pela Ordem Narrativa (branco) e pelo Arco Narrativo (cor do Arco), com bifurcação e convergência', async () => {
+  await T('Q08 ficha da Cena: a fita do percurso — nomes, posição, linhas até às caixas das Cenas, bifurcação e convergência; a ficha não fecha ao navegar e desliza', async () => {
     state = demoProject(); state.scenes.s7.convergeTo = 's9'; commit(); renderAll(); closeAllModals();
-    const nav = id => { openSceneFicha(id); const r = {}; topModal().querySelectorAll('.scn-btn').forEach(b => r[b.dataset.nav] = (b.disabled ? '-' : '') + (b.classList.contains('fork') ? 'fork' : b.classList.contains('merge') ? 'merge' : 'ok')); closeAllModals(); return r; };
-    eq(nav('s1'), {'narr-prev':'-ok', 'narr-next':'ok', 'arc-prev':'-ok', 'arc-next':'ok'});
-    eq(nav('s2')['arc-next'], 'fork'); eq(nav('s4')['arc-prev'], 'fork'); eq(nav('s7')['arc-next'], 'merge'); eq(nav('s9')['arc-prev'], 'merge'); eq(nav('s9')['arc-next'], '-ok');
-    openSceneFicha('s2'); const b = topModal().querySelector('[data-nav="arc-prev"]'); eq(getComputedStyle(b).backgroundColor, (() => { const d = h('span', {style:{color:arcColor(arcById('a1'))}}); document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; })(), 'da cor do Arco');
-    ok(getComputedStyle(topModal().querySelector('[data-nav="narr-next"]')).backgroundColor === 'rgb(255, 255, 255)', 'o par da Ordem Narrativa é branco');
-    topModal().querySelectorAll('.scn-btn').forEach(x => ok(tipFor(x) && x.getAttribute('aria-label'), 'sem explicador'));
-    const order = narrOrder(); topModal().querySelector('[data-nav="narr-next"]').click(); await W(30);
-    eq(modals().length, 1); eq(topModal().querySelector('input').value, state.scenes[order[order.indexOf('s2') + 1]].title); eq(document.activeElement.dataset.nav, 'narr-next', 'o foco fica no botão');
-    closeAllModals(); openSceneFicha('s2'); topModal().querySelector('[data-nav="arc-next"]').click(); await W(20); eq(menuLabels().length, 2, 'bifurcação: escolher o caminho');
-    document.querySelectorAll('.ctx-item')[1].click(); await W(30); eq(topModal().querySelector('input').value, state.scenes.s4.title, 'segue o Ramo');
-    topModal().querySelector('[data-nav="arc-prev"]').click(); await W(30); eq(topModal().querySelector('input').value, state.scenes.s2.title, 'volta à Cena da bifurcação');
-    closeAllModals(); openSceneFicha('s7'); topModal().querySelector('[data-nav="arc-next"]').click(); await W(30); eq(topModal().querySelector('input').value, state.scenes.s9.title, 'convergência');
+    const q = s => topModal().querySelector(s), qa = s => [...topModal().querySelectorAll(s)], names = s => qa(s + ' .ft-node').map(n => n.textContent + (n.classList.contains('alt') ? '*' : ''));
+    const title = () => q('.ficha input').value, cssColor = css => { const d = h('span', {style:{color:css}}); document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+    openSceneFicha('s1'); const box = topModal();
+    eq(qa('.ft-here .ft-long').map(x => x.textContent), ['1 de 10', '1 de 4']); eq(qa('.ft-end').map(x => x.textContent), ['Início do livro', 'Início do Arco']);
+    eq(qa('.ft-arrow').map(b => b.dataset.nav + (b.disabled ? ' ×' : '')), ['narr-prev ×', 'arc-prev ×', 'narr-next', 'arc-next'], 'setas agrupadas por lado: anteriores à esquerda, seguintes à direita'); eq(names('.ft-trk.narr .ft-c.next'), ['A casa da avó']);
+    eq(getComputedStyle(q('[data-nav="narr-next"]')).backgroundColor, 'rgb(255, 255, 255)', 'a seta do livro é branca'); eq(getComputedStyle(q('[data-nav="arc-next"]')).backgroundColor, cssColor(arcColor(arcById('a1'))), 'a do Arco tem a cor do Arco');
+    ok(parseFloat(getComputedStyle(q('.ft-trk.arc .ft-here'), '::after').height) >= 6, 'linhas grossas'); eq(getComputedStyle(q('.ft-trk.narr'), '::before').content, 'none', 'a linha não atravessa a ficha');
+    ok(Math.abs(q('.ft-trk.narr .ft-c.next .ft-node').getBoundingClientRect().left - q('.ft-trk.narr .ft-here').getBoundingClientRect().right - parseFloat(getComputedStyle(q('.ft-trk.narr .ft-here'), '::after').width) + 2) < 1.5, 'a linha acaba na caixa da Cena seguinte');
+    eq(getComputedStyle(q('.ft-trk.narr .ft-here'), '::before').display, 'none', 'no início do livro não há linha para trás'); eq(getComputedStyle(q('[data-nav="arc-next"]')).backgroundImage, 'none', 'sem bifurcação, a seta tem só a cor do Arco'); ok(!q('.modal-head .ft-arrow') && !q('.modal-head button:not(.icon-btn)'), 'a linha do título fica só com o título e o ✕');
+    ok(q('.scn-fita').offsetHeight <= 64, 'a fita ocupa pouco: ' + q('.scn-fita').offsetHeight + ' px');
+    q('[data-nav="narr-next"]').click(); await W(20);
+    ok(topModal() === box && modals().length === 1, 'é a mesma ficha, não uma nova'); eq(title(), 'A casa da avó'); eq(openModals[0].entity, {kind:'scene', id:'s2'}); eq(document.activeElement.dataset.nav, 'narr-next', 'o foco fica na seta');
+    ok(box.classList.contains('slide-next'), 'a caixa desliza'); eq(getComputedStyle(box).animationName, 'ficha-next'); eq(getComputedStyle(q('[data-nav="narr-next"]')).animationName, 'ft-hold-next', 'as setas ficam paradas');
+    // bifurcação: a linha do Arco divide-se; a seta segue em frente e a Cena do Ramo fica por baixo, na cor do Ramo
+    eq(names('.ft-trk.arc .ft-c.next'), ['A carta por abrir', 'Duarte foge de casa*']); ok(q('[data-nav="arc-next"]').classList.contains('fork'), 'a seta mostra a bifurcação');
+    { const bg = getComputedStyle(q('[data-nav="arc-next"]')).backgroundImage; ok(/gradient/.test(bg) && bg.includes(cssColor(arcColor(arcById('a1')))) && bg.includes(cssColor(arcColor(arcById('a3')))), 'na bifurcação, a seta mistura as cores dos dois Arcos: ' + bg);
+      const ink = [.082, .09, .11]; [arcById('a1'), arcById('a3')].forEach(x => ok(contrast(cssColor(arcColor(x)).match(/[\d.]+/g).slice(0, 3).map(v => v / 255), ink) >= 7, 'o símbolo lê-se sobre as duas cores')); }
+    eq(getComputedStyle(q('[data-nav="arc-next-1"]')).backgroundColor, cssColor(arcColor(arcById('a3')))); ok(parseFloat(getComputedStyle(q('[data-nav="arc-next-1"]'), '::before').height) > 20, 'cotovelo da bifurcação');
+    qa('.ft-arrow, .ft-node').forEach(x => ok(tipFor(x) && tipFor(x).text && x.getAttribute('aria-label'), 'sem explicador: ' + x.dataset.nav)); ok(tipFor(q('.ft-here')), 'a posição tem explicador');
+    q('[data-nav="arc-next"]').click(); await W(20); eq(title(), 'A carta por abrir', 'a seta segue em frente pelo Arco');
+    q('[data-nav="arc-prev"]').click(); await W(20); eq(title(), 'A casa da avó'); ok(box.classList.contains('slide-prev'), 'para trás, desliza do outro lado');
+    q('[data-nav="arc-next-1"]').click(); await W(20); eq(title(), 'Duarte foge de casa', 'a Cena da fita leva ao Ramo'); eq(document.activeElement.dataset.nav, 'arc-next');
+    ok(q('[data-nav="arc-prev"]').classList.contains('fork')); eq(names('.ft-trk.arc .ft-c.prev'), ['A casa da avó']); eq(getComputedStyle(q('[data-nav="arc-next"]')).backgroundColor, cssColor(arcColor(arcById('a3'))));
+    q('[data-nav="arc-next"]').click(); await W(20); eq(title(), 'Noite no cais'); ok(q('[data-nav="arc-next"]').classList.contains('merge'), 'a seta mostra a convergência'); ok(/gradient/.test(getComputedStyle(q('[data-nav="arc-next"]')).backgroundImage), 'e mistura as cores');
+    q('[data-nav="arc-next"]').click(); await W(20); eq(title(), 'O que a avó sabia', 'convergência'); eq(names('.ft-trk.arc .ft-c.prev'), ['A carta por abrir', 'Noite no cais*']);
+    ok(q('[data-nav="arc-next"]').disabled); eq(qa('.ft-end').map(x => x.textContent), ['Fim do Arco']);
+    // a ficha acompanha o que muda no projeto: ao anular, a fita volta a desenhar-se
+    state.scenes.s7.convergeTo = null; commit(); renderAll(); topModal() && openModals[0].redraw(); eq(names('.ft-trk.arc .ft-c.prev'), ['A carta por abrir']);
+    await W(560); ok(!box.classList.contains('slide-next') && !box.classList.contains('slide-prev'), 'a animação termina');
     closeAllModals(); fx(); });
+  await T('Q09 ficha da Cena: ← e → percorrem o livro e, com Shift, o Arco Narrativo — não ao escrever, nem com outra janela por cima, nem na visita', async () => {
+    state = demoProject(); commit(); renderAll(); closeAllModals(); openSceneFicha('s2'); const box = topModal();
+    const title = () => box.querySelector('.ficha input').value;
+    const key = (k, o, el) => { const ev = new KeyboardEvent('keydown', Object.assign({key:k, bubbles:true, cancelable:true}, o || {})); (el || document.body).dispatchEvent(ev); return ev.defaultPrevented; };
+    ok(key('ArrowRight'), 'a tecla é usada'); eq(title(), 'Luz apagada'); eq(modals().length, 1); key('ArrowLeft'); eq(title(), 'A casa da avó');
+    key('ArrowRight', {shiftKey:true}); eq(title(), 'A carta por abrir', 'Shift: pelo Arco'); key('ArrowLeft', {shiftKey:true}); eq(title(), 'A casa da avó');
+    key('ArrowLeft'); key('ArrowLeft'); eq(title(), 'Inês desembarca na ilha', 'no início do livro, ← não faz nada');
+    box.classList.remove('slide-next', 'slide-prev'); key('ArrowRight', {repeat:true}); eq(title(), 'A casa da avó'); ok(!box.classList.contains('slide-next'), 'tecla premida: sem animação');
+    const inp = box.querySelector('.ficha input'); inp.focus(); ok(!key('ArrowLeft', null, inp), 'num campo de texto, a seta é do texto'); ok(!key('ArrowLeft', null, box.querySelector('.ficha textarea'))); ok(!key('ArrowLeft', null, box.querySelector('.ficha select'))); eq(title(), 'A casa da avó');
+    const chk = box.querySelector('.ficha input[type=checkbox]'); ok(chk, 'há caixas de seleção na ficha'); ok(key('ArrowRight', null, chk), 'numa caixa de seleção, navega'); eq(title(), 'Luz apagada'); key('ArrowLeft');
+    ok(!key('ArrowRight', {ctrlKey:true}) && !key('ArrowRight', {altKey:true}), 'com Ctrl ou Alt, não'); eq(title(), 'A casa da avó');
+    openCharFicha(state.characters[0].id); ok(!key('ArrowRight'), 'com outra ficha por cima, não'); openModals[openModals.length - 1].close(); eq(title(), 'A casa da avó');
+    Tour.active = true; try { key('ArrowRight'); eq(title(), 'A casa da avó', 'na visita guiada, as setas são da visita'); } finally { Tour.active = false; }
+    closeAllModals(); ok(!key('ArrowRight'), 'sem ficha aberta, nada'); fx(); });
+  await T('Q10 fita e setas: no PC as setas ficam fora da ficha, a meio da altura; em janelas estreitas, nas pontas das linhas; no telemóvel, a fita fica fixa em baixo', async () => {
+    state = demoProject(); commit(); flushSave();
+    const probe = async (w, hh) => { let r; await phone(w, hh, async (win, d) => { win.eval("closeAllModals(); quietModals = true; openSceneFicha('s2'); quietModals = false;"); await W(80);
+      const m = d.querySelector('.modal.scene-modal'), box = m.getBoundingClientRect(), f = d.querySelector('.scn-fita').getBoundingClientRect(), A = k => d.querySelector('.ft-arrow[data-nav="' + k + '"]').getBoundingClientRect();
+      const all = ['narr-prev', 'narr-next', 'arc-prev', 'arc-next'].map(A), mid = () => (A('narr-prev').top + A('arc-prev').bottom) / 2, mid0 = mid();
+      d.querySelector('.modal-back').scrollTop = 240; await W(30); const mid1 = mid(); d.querySelector('.modal-back').scrollTop = 0;
+      r = {wide:m.classList.contains('ft-wide'), out:all.every(x => x.right <= box.left + 1 || x.left >= box.right - 1), inside:all.every(x => x.left >= box.left - 1 && x.right <= box.right + 1),
+        seen:all.every(x => x.left >= 0 && x.right <= win.innerWidth), left:A('narr-prev').right <= box.left && A('arc-prev').right <= box.left, right:A('narr-next').left >= box.right && A('arc-next').left >= box.right,
+        mid0:Math.round(mid0), mid1:Math.round(mid1), vh:win.innerHeight, fitaTop:Math.round(f.top), fitaBottom:Math.round(f.bottom), headBottom:Math.round(d.querySelector('.modal-head').getBoundingClientRect().bottom),
+        noScrollX:d.documentElement.scrollWidth <= win.innerWidth + 1, big:A('narr-prev').width > A('arc-prev').width, short:win.getComputedStyle(d.querySelector('.ft-short')).display !== 'none',
+        level:Math.abs(A('narr-prev').top - A('narr-next').top) < 1 && Math.abs(A('arc-prev').top - A('arc-next').top) < 1, inFita:!!d.querySelector('.scn-fita .ft-arrow'),
+        names:[...d.querySelectorAll('.ft-node')].map(x => x.textContent).join('|')}; }); return r; };
+    let r = await probe(1280, 800); ok(r.wide && r.out && r.left && r.right && r.seen && r.big && r.level && !r.short && !r.inFita, 'PC: setas fora da ficha, de cada lado, a branca maior ' + JSON.stringify(r));
+    ok(Math.abs(r.mid0 - r.vh / 2) < 4, 'PC: as setas ficam a meio da altura: ' + r.mid0 + ' de ' + r.vh); ok(Math.abs(r.mid1 - r.mid0) < 2, 'PC: ao deslocar a ficha, as setas ficam no mesmo sítio: ' + r.mid1);
+    ok(Math.abs(r.fitaTop - r.headBottom) < 8, 'PC: a fita fica sob o título'); eq(r.names, 'Inês desembarca na ilha|Luz apagada|Inês desembarca na ilha|A carta por abrir|Duarte foge de casa');
+    r = await probe(800, 900); ok(!r.wide && r.inside && r.inFita && r.noScrollX && r.level, 'janela estreita: setas nas pontas das linhas da fita ' + JSON.stringify(r)); ok(Math.abs(r.fitaTop - r.headBottom) < 8, 'janela estreita: sob o título');
+    r = await probe(390, 800); ok(!r.wide && r.inside && r.inFita && r.noScrollX && r.short, 'telemóvel ' + JSON.stringify(r)); ok(Math.abs(r.fitaBottom - r.vh) < 2, 'telemóvel: a fita fica fixa em baixo: ' + r.fitaBottom + ' de ' + r.vh); });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };

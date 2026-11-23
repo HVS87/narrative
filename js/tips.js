@@ -39,7 +39,7 @@ const CARD_TIPS = {
 /* por texto do botão / item de menu */
 const TEXT_TIPS = trK({
   'Aplicar cores seguras para daltonismo':[_('Cores seguras para daltonismo'), _('Dá aos Arcos Narrativos deste projeto, pela ordem em que estão, cores que se distinguem com protanopia, deuteranopia e tritanopia. Pode ser anulado com Ctrl+Z.')],
-  'Começar':[_('Começar'), _('Fecha este aviso. Fica sempre disponível no fim das Definições.')],
+  'Começar':[_('Começar'), _('Fecha este aviso e começa a usar a ferramenta.')],
   '+ Arco Narrativo':[_('Novo Arco Narrativo'), _('Cria um Arco Narrativo vazio, com uma cor atribuída automaticamente e uma faixa própria no quadro.')],
   '+ Novo Tomo':[_('Novo Tomo'), _('Acrescenta um Tomo no fim da sequência, já com um Capítulo vazio.')],
   '+ Nova Personagem':[_('Nova Personagem'), _('Cria uma Personagem e abre a sua ficha. Para figurar num Tomo, adicione-a a uma Cena.')],
@@ -246,9 +246,17 @@ const TIP_RULES = [
   ['.sup-nav button', _('Secção'), _('Mostra as fichas desta secção. O número indica quantas fichas tem.')],
   ['.page-head input.inp', _('Filtro'), _('Escreva para pesquisar com sugestão automática e filtrar a lista.')],
   ['.page-head select', _('Filtrar por Tomo'), _('Mostra só as Personagens que figuram no Tomo escolhido.')],
-  ['.scn-btn', el => el.getAttribute('aria-label'), el => ({'narr-prev':_('A Cena que vem antes desta no livro, pela linha branca.'), 'narr-next':_('A Cena que vem a seguir a esta no livro, pela linha branca.'),
-    'arc-prev':el.classList.contains('fork') ? _('Esta Cena abre um Ramo: a anterior é a Cena de onde o Ramo parte.') : el.classList.contains('merge') ? _('Há Arcos Narrativos que convergem nesta Cena: escolha de onde vem.') : _('A Cena anterior deste Arco Narrativo, pela Ordem Cronológica (a linha colorida).'),
-    'arc-next':el.classList.contains('fork') ? _('O Arco Narrativo bifurca-se aqui: escolha continuar neste Arco ou seguir o Ramo.') : el.classList.contains('merge') ? _('Este Arco Narrativo converge noutro: segue para a Cena onde se junta.') : _('A Cena seguinte deste Arco Narrativo, pela Ordem Cronológica (a linha colorida).')})[el.dataset.nav]],
+  /* a fita do percurso, na ficha da Cena */
+  ['.ft-arrow', el => el.getAttribute('aria-label'), el => ({
+    'narr-prev':_('A Cena que vem antes desta no livro, pela linha branca. Tecla ←.'),
+    'narr-next':_('A Cena que vem a seguir a esta no livro, pela linha branca. Tecla →.'),
+    'arc-prev':el.classList.contains('fork') ? _('Esta Cena abre um Ramo: a seta volta à Cena de onde o Ramo parte. Teclas Shift + ←.')
+      : el.classList.contains('merge') ? _('Há Arcos Narrativos que convergem nesta Cena: a seta segue pela linha deste Arco e as Cenas de onde os outros vêm estão na fita. Teclas Shift + ←.')
+      : _('A Cena anterior deste Arco Narrativo, pela linha da cor do Arco. Teclas Shift + ←.'),
+    'arc-next':el.classList.contains('fork') ? _('O Arco Narrativo bifurca-se aqui: a seta segue em frente e a Cena do Ramo está na fita, por baixo. Teclas Shift + →.')
+      : el.classList.contains('merge') ? _('Este Arco Narrativo converge noutro: a seta leva à Cena onde se junta. Teclas Shift + →.')
+      : _('A Cena seguinte deste Arco Narrativo, pela linha da cor do Arco. Teclas Shift + →.')})[el.dataset.nav]],
+  ['.ft-node', el => el.dataset.name, el => el.dataset.rel],
   ['.lang-seg button', _('Língua'), _('Muda a língua da ferramenta e dos Materiais de Apoio neste dispositivo. A página recarrega; os projetos não mudam.')],
   ['.a11y-card .seg button', el => txt(el), el => trK({'Normal':_('Texto no tamanho de origem.'), 'Grande':_('Texto 15% maior nas páginas, fichas, menus e avisos.'), 'Muito grande':_('Texto 30% maior nas páginas, fichas, menus e avisos.'),
     'Automático (segue o sistema)':_('Reduz as animações se o sistema operativo o pedir.'), 'Reduzidas':_('Quase sem animações nem transições, em qualquer caso.'), 'Normais':_('Animações e transições sempre ativas.')})[txt(el)] || ''],

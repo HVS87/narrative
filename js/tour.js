@@ -63,7 +63,7 @@ const TOUR_STEPS = [
     text:_('A última Cena de cada Arco Narrativo tem uma pequena bola na margem direita: arraste-a até uma Cena de outro Arco Narrativo — em qualquer Capítulo ou Tomo — e o Arco Narrativo passa a convergir nela, após confirmação. Também funciona com um clique longo do botão direito. Em alternativa, escolha «Criar convergência…» no menu da Cena e indique a Cena de destino.'),
     sim:tk => simLink(tk, 's7', 's9') },
   { sel:'.modal', title:_('Ficha da Cena'), setup:() => openSceneFicha('s2'),
-    text:_('Título, resumo, Arco Narrativo (nunca em branco), POV, Personagens, Cenários, posição na Ordem Narrativa e na Ordem Cronológica, e ainda Notas e Referências associadas. No topo, os botões redondos «<» e «>» levam à Cena anterior e à seguinte: os brancos pela Ordem Narrativa, os da cor do Arco Narrativo pelo próprio Arco — e mudam de símbolo onde ele se bifurca ou converge.') },
+    text:_('Título, resumo, Arco Narrativo (nunca em branco), POV, Personagens, Cenários, posição na Ordem Narrativa e na Ordem Cronológica, e ainda Notas e Referências associadas. No topo, a fita do percurso mostra, como no quadro, a Cena anterior e a seguinte do livro (linha branca) e as do Arco Narrativo (linha da cor do Arco), com as bifurcações e as convergências desenhadas. Clique numa Cena da fita ou nas setas para lá ir, ou use ← e → (com Shift, pelo Arco).') },
   { sel:'.modal', title:_('Ficha do Tomo'), setup:() => openBookFicha('b1'),
     text:_('Nome, cor do Tomo (que o distingue no quadro e nas listas), tipo de narrador (com ligação aos Materiais de Apoio) e a lista automática de Personagens: primeiro as Personagens Principais, depois as Secundárias, com POV, género e idade. «Marcar como principal» só afeta este Tomo.') },
   { sel:'#view-page', tab:'plan', title:_('Calendarização e Objetivos'),
@@ -128,7 +128,7 @@ const TOUR_DEEP = [
   { sel:'.upd-card', tab:'settings', title:_('Atualizações'), setup:() => { const c = $('.upd-card'); c && c.scrollIntoView({block:'center'}); },
     text:_('A ferramenta procura versões novas sozinha e instala-as num momento em que não esteja a meio de nada, no PC, no telemóvel e no tablet — sem desinstalar nem voltar a instalar. Pode desligar a instalação automática e escolher o momento.') },
   { title:_('Teclado'), when:() => !coarse(),
-    text:_('Esc fecha a janela de cima, cancela um arrasto ou uma convergência em curso e termina esta visita. Ctrl+Z anula e Ctrl+Shift+Z refaz. Enter confirma as janelas de nome. Tab percorre os botões e, nas amostras de cor, as setas mudam de cor.') },
+    text:_('Esc fecha a janela de cima, cancela um arrasto ou uma convergência em curso e termina esta visita. Ctrl+Z anula e Ctrl+Shift+Z refaz. Enter confirma as janelas de nome. Tab percorre os botões e, nas amostras de cor, as setas mudam de cor. Na ficha de uma Cena, ← e → passam à Cena anterior e à seguinte (com Shift, pelo Arco Narrativo).') },
   { title:_('Ecrãs táteis'), text:_('Um toque faz de clique; um toque longo e arrastar move Cenas, Capítulos e Tomos; um toque longo sem arrastar abre o menu. Num telemóvel ao alto, a ferramenta sugere rodá-lo para ver mais do quadro; os nomes cortados aparecem inteiros no topo do menu do toque longo.') },
   { title:_('Fim da visita detalhada'), text:_('O seu projeto volta, exatamente como estava. As duas visitas estão sempre disponíveis no botão de ajuda (?) — no telemóvel, em Mais — e nas Definições do Projeto.') }
 ];

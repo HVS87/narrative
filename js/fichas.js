@@ -60,11 +60,14 @@ function refsSection(kind, id, redraw){
 }
 
 /* ---------- Scene ---------- */
-/* ----- percorrer as Cenas a partir da ficha -----
-   Par branco: a Cena anterior e a seguinte na Ordem Narrativa (a linha branca do quadro).
-   Par da cor do Arco Narrativo: a anterior e a seguinte na Ordem Cronológica do Arco (a linha colorida). Onde o Arco
-   se bifurca (um Ramo parte desta Cena, ou esta é a primeira de um Ramo) ou converge (esta Cena converge noutra, ou
-   outras convergem nela), o símbolo muda; com mais de um destino possível, o botão abre a escolha. */
+/* ----- percorrer as Cenas a partir da ficha: a fita do percurso e as setas -----
+   A fita, no topo da ficha, tem duas linhas como as do quadro: a branca é a Ordem Narrativa (a ordem do livro) e a da cor
+   do Arco Narrativo é a ordem do Arco. Cada linha liga a Cena anterior à posição desta («2 de 10») e à Cena seguinte, e
+   acaba nas caixas dessas Cenas; onde o Arco se bifurca ou converge, a linha divide-se ou junta-se e aparecem as Cenas
+   de cada caminho, cada uma na cor do seu Arco. Clicar numa Cena da fita leva a essa Cena.
+   As setas — brancas para o livro, da cor do Arco para o Arco — ficam fora da ficha, a meio da altura, sempre no mesmo
+   sítio; sem margem para elas, ficam nas pontas de cada linha da fita. Uma seta segue em frente; numa bifurcação ou
+   convergência mostra o símbolo e mistura as cores dos Arcos. ← e → fazem o mesmo que as brancas; com Shift, as do Arco. */
 function sceneArcLinks(s){
   const own = arcOwnScenes(s.arcId), i = own.findIndex(x => x.id === s.id), arc = arcById(s.arcId);
   const prev = [], next = [];
@@ -74,45 +77,105 @@ function sceneArcLinks(s){
   if (i >= 0 && i < own.length - 1) next.push({id:own[i + 1].id, kind:'arc'});
   state.arcs.filter(a => a.parentId === s.arcId && a.forkSceneId === s.id).forEach(a => { const f = arcOwnScenes(a.id)[0]; if (f) next.push({id:f.id, kind:'fork'}); });
   if (s.convergeTo && state.scenes[s.convergeTo] && state.scenes[s.convergeTo].arcId !== s.arcId) next.push({id:s.convergeTo, kind:'merge'});
-  return {prev, next};
+  return {prev, next, i:i + 1, n:own.length};
 }
-function sceneNav(s, m){
-  const order = narrOrder(), i = order.indexOf(s.id), arc = arcById(s.arcId), links = sceneArcLinks(s);
-  // a ficha é trocada pela da outra Cena, sem animação; o foco fica no mesmo botão (ou no do lado, se este já não tiver para onde ir)
-  const go = (id, k) => { if (!state.scenes[id]) return;
-    quietModals = true; try { m.close(); openSceneFicha(id); } finally { quietModals = false; }
-    const nav = [...document.querySelectorAll('.scn-nav')].pop(); if (!nav) return;
-    const b = nav.querySelector('[data-nav="' + k + '"]:not(:disabled)') || nav.querySelector('.scn-btn:not(:disabled)'); if (b) b.focus({preventScroll:true}); };
-  const label = id => { const x = state.scenes[id], a = x && arcById(x.arcId); return (x.title || _('Sem título')) + (a && a.id !== s.arcId ? ' · ' + a.name : ''); };
-  const btn = (k, icon, aria, targets, cls, style) => {
-    const b = h('button', {class:'scn-btn ' + cls, dataset:{nav:k}, style, 'aria-label':aria, disabled:!targets.length,
-      onclick:e => { if (targets.length === 1) return go(targets[0].id, k);
-        const rc = e.currentTarget.getBoundingClientRect(); showMenu(rc.left, rc.bottom + 4, targets.map(t => ({label:(t.kind === 'fork' ? '⑂ ' : t.kind === 'merge' ? '⤙ ' : '') + label(t.id), action:() => go(t.id, k)}))); }}, svgIcon(icon));
-    return b; };
-  const kindOf = (list, dir) => list.some(t => t.kind === 'fork') ? 'fork' : list.some(t => t.kind === 'merge') ? 'merge' : dir;
-  const arcIcon = (list, dir) => { const k = kindOf(list, dir); return k === 'fork' ? (dir === 'prev' ? 'forkL' : 'forkR') : k === 'merge' ? (dir === 'prev' ? 'mergeL' : 'mergeR') : (dir === 'prev' ? 'chevL' : 'chevR'); };
-  const arcAria = (list, dir) => { const k = kindOf(list, dir);
-    if (k === 'fork') return dir === 'prev' ? _('Cena anterior deste Arco Narrativo (bifurcação)') : _('Próxima Cena deste Arco Narrativo (bifurcação)');
-    if (k === 'merge') return dir === 'prev' ? _('Cena anterior deste Arco Narrativo (convergência)') : _('Próxima Cena deste Arco Narrativo (convergência)');
-    return dir === 'prev' ? _('Cena anterior deste Arco Narrativo') : _('Próxima Cena deste Arco Narrativo'); };
-  const ink = arc ? {'--arc':arcColor(arc)} : null;
-  return h('span', {class:'scn-nav', role:'group', 'aria-label':_('Percorrer as Cenas')},
-    h('span', {class:'scn-pair narr-pair'},
-      btn('narr-prev', 'chevL', _('Cena anterior na Ordem Narrativa'), i > 0 ? [{id:order[i - 1], kind:'narr'}] : [], 'narr'),
-      btn('narr-next', 'chevR', _('Próxima Cena na Ordem Narrativa'), i >= 0 && i < order.length - 1 ? [{id:order[i + 1], kind:'narr'}] : [], 'narr')),
-    h('span', {class:'scn-pair arc-pair'},
-      btn('arc-prev', arcIcon(links.prev, 'prev'), arcAria(links.prev, 'prev'), links.prev, 'arc' + (kindOf(links.prev, '') ? ' ' + kindOf(links.prev, '') : ''), ink),
-      btn('arc-next', arcIcon(links.next, 'next'), arcAria(links.next, 'next'), links.next, 'arc' + (kindOf(links.next, '') ? ' ' + kindOf(links.next, '') : ''), ink)));
+/* As setas ficam fora da ficha quando há margem para elas (PC); senão, nas pontas das linhas, dentro da ficha.
+   Conta com o tamanho do texto escolhido nas Definições e com a janela do segundo ecrã, onde a ficha é mais larga. */
+const fitaWide = () => { const z = {l:1.15, xl:1.3}[document.body.dataset.fs] || 1;
+  return !MOBILE_Q.matches && innerWidth >= z * ((document.body.classList.contains('second') ? 900 : 720) + 140); };
+window.addEventListener('resize', () => openModals.forEach(m => { if (m.fitaFit) m.fitaFit(); }));
+/* devolve as linhas da fita, as setas laterais (quando há margem) e, para cada botão (data-nav), o destino:
+   uma Cena (id) ou as Cenas de uma seta (list) */
+function sceneFita(s, wide){
+  const order = narrOrder(), ni = order.indexOf(s.id), arc = arcById(s.arcId), L = sceneArcLinks(s), to = {};
+  const np = ni > 0 ? [{id:order[ni - 1], kind:'narr'}] : [], nn = ni >= 0 && ni < order.length - 1 ? [{id:order[ni + 1], kind:'narr'}] : [];
+  const tone = x => x ? {'--arc':arcColor(x), '--arc-line':arcStroke(x)} : {};
+  const an = x => { const y = arcById(x.arcId); return y ? y.name : ''; };
+  const rel = (t, x, track, dir) => track === 'narr' ? (dir === 'prev' ? _('A Cena anterior na Ordem Narrativa. Clique para a abrir.') : _('A Cena seguinte na Ordem Narrativa. Clique para a abrir.'))
+    : t.kind === 'fork' ? (dir === 'prev' ? _('A Cena de onde este Ramo parte, em «{arco}». Clique para a abrir.', {arco:an(x)}) : _('Aqui parte o Ramo «{arco}». Clique para o seguir.', {arco:an(x)}))
+    : t.kind === 'merge' ? (dir === 'prev' ? _('O Arco Narrativo «{arco}» converge nesta Cena a partir daqui. Clique para a abrir.', {arco:an(x)}) : _('Este Arco Narrativo converge aqui, em «{arco}». Clique para a abrir.', {arco:an(x)}))
+    : (dir === 'prev' ? _('A Cena anterior deste Arco Narrativo. Clique para a abrir.') : _('A Cena seguinte deste Arco Narrativo. Clique para a abrir.'));
+  const node = (t, track, dir, i) => { const x = state.scenes[t.id], k = track + '-' + dir + '-' + i, name = x.title || _('Sem título'), r = rel(t, x, track, dir); to[k] = {id:t.id, dir};
+    return h('button', {class:'ft-node' + (i ? ' alt' : ''), dataset:{nav:k, name, rel:r}, style:Object.assign({'--i':i}, tone(arcById(x.arcId))), 'aria-label':name + '. ' + r}, h('span', null, name)); };
+  const cell = (list, track, dir) => h('div', {class:'ft-c ' + dir},
+    list.length ? list.map((t, i) => node(t, track, dir, i))
+      : h('span', {class:'ft-end'}, track === 'narr' ? (dir === 'prev' ? _('Início do livro') : _('Fim do livro')) : (dir === 'prev' ? _('Início do Arco') : _('Fim do Arco'))));
+  const kindOf = list => list.some(t => t.kind === 'fork') ? 'fork' : list.some(t => t.kind === 'merge') ? 'merge' : '';
+  const aria = (track, dir, kd) => track === 'narr' ? (dir === 'prev' ? _('Cena anterior na Ordem Narrativa') : _('Próxima Cena na Ordem Narrativa'))
+    : kd === 'fork' ? (dir === 'prev' ? _('Cena anterior deste Arco Narrativo (bifurcação)') : _('Próxima Cena deste Arco Narrativo (bifurcação)'))
+    : kd === 'merge' ? (dir === 'prev' ? _('Cena anterior deste Arco Narrativo (convergência)') : _('Próxima Cena deste Arco Narrativo (convergência)'))
+    : (dir === 'prev' ? _('Cena anterior deste Arco Narrativo') : _('Próxima Cena deste Arco Narrativo'));
+  /* numa bifurcação ou convergência, a seta mistura a cor deste Arco (do lado da ficha) com a dos Arcos que aqui se separam
+     ou se juntam (do lado para onde aponta); são todas cores claras, por isso o símbolo escuro lê-se sempre */
+  const mix = (list, dir) => { const cols = [arcColor(arc)];
+    list.forEach(t => { if (t.kind !== 'fork' && t.kind !== 'merge') return; const col = arcColor(arcById(state.scenes[t.id].arcId)); if (!cols.includes(col)) cols.push(col); });
+    if (cols.length < 2) return {};
+    const seg = 100 / cols.length, stops = cols.map((col, i) => col + ' ' + (i ? Math.round(i * seg + seg * .4) : 0) + '% ' + (i < cols.length - 1 ? Math.round((i + 1) * seg - seg * .4) : 100) + '%');
+    return {backgroundImage:'linear-gradient(' + (dir === 'prev' ? 'to left' : 'to right') + ', ' + stops.join(', ') + ')'}; };
+  const arrow = (list, track, dir) => { const kd = track === 'arc' ? kindOf(list) : '', k = track + '-' + dir; to[k] = {list, dir};
+    return h('button', {class:'ft-arrow ' + track + ' ' + dir + (kd ? ' ' + kd : ''), dataset:{nav:k}, 'aria-label':aria(track, dir, kd), disabled:!list.length,
+      style:track === 'arc' ? Object.assign(tone(arc), kd ? mix(list, dir) : {}) : null},
+      svgIcon(kd === 'fork' ? (dir === 'prev' ? 'forkL' : 'forkR') : kd === 'merge' ? (dir === 'prev' ? 'mergeL' : 'mergeR') : dir === 'prev' ? 'arrL' : 'arrR')); };
+  const A = {np:arrow(np, 'narr', 'prev'), nn:arrow(nn, 'narr', 'next'), ap:arrow(L.prev, 'arc', 'prev'), an:arrow(L.next, 'arc', 'next')};
+  const trk = (track, p, n, i, N, style, tip, a1, a2) => h('div', {class:'ft-trk ' + track + (p.length ? '' : ' no-prev') + (n.length ? '' : ' no-next'), style},
+    wide ? null : a1, cell(p, track, 'prev'),
+    h('span', {class:'ft-here', dataset:{tip}}, h('span', {class:'ft-long'}, _('{n} de {total}', {n:i, total:N})), h('span', {class:'ft-short', 'aria-hidden':'true'}, i + '/' + N)),
+    cell(n, track, 'next'), wide ? null : a2);
+  return { to,
+    rows:[trk('narr', np, nn, ni + 1, order.length, null, _('A posição desta Cena na Ordem Narrativa.'), A.np, A.nn),
+      trk('arc', L.prev, L.next, L.i, L.n, tone(arc), _('A posição desta Cena no Arco Narrativo «{nome}».', {nome:arc ? arc.name : ''}), A.ap, A.an)],
+    sides:wide ? [h('div', {class:'ft-side prev'}, A.np, A.ap), h('div', {class:'ft-side next'}, A.nn, A.an)] : [] };
 }
+/* ← e → percorrem a Ordem Narrativa e, com Shift, o Arco Narrativo — quando a ficha de uma Cena está por cima e não se está a escrever */
+document.addEventListener('keydown', e => {
+  if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
+  const top = openModals[openModals.length - 1]; if (!top || !top.sceneNav || menuEl || Tour.active || document.querySelector('.ac-list')) return;
+  const t = e.target, tag = t && t.tagName;
+  if (t && (t.isContentEditable || tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && !/^(checkbox|button|submit|reset|file|color)$/.test(t.type)))) return;
+  e.preventDefault(); top.sceneNav(e.shiftKey ? 'arc' : 'narr', e.key === 'ArrowLeft' ? 'prev' : 'next', e.repeat);
+});
 function openSceneFicha(id){
   if (!state.scenes[id]) return;
   const body = h('div', {class:'ficha'});
-  const m = openModal({title:_('Cena'), body, wide:true});
+  const m = openModal({title:_('Cena'), body, wide:true, cls:'scene-modal'});
+  const box = m.back.querySelector('.modal'), fita = h('div', {class:'scn-fita', role:'group', 'aria-label':_('Percorrer as Cenas')}), sides = h('div', {class:'ft-sides'});
+  m.back.querySelector('.modal-head').after(fita, sides);
+  let to = {}, slideT = 0;
+  /* Passa a outra Cena sem fechar a ficha: troca o conteúdo, volta ao topo, desliza a caixa para o lado de onde se vem
+     e deixa o foco no mesmo botão (ou na seta do mesmo lado, se esse botão já não existir). */
+  const go = (nid, k, dir, quick) => {
+    if (!state.scenes[nid] || nid === id) return false;
+    id = nid; if (m.entity) m.entity.id = nid;
+    draw(); m.back.scrollTop = 0; Dual.report();
+    box.classList.remove('slide-next', 'slide-prev');
+    clearTimeout(slideT);
+    if (!quick && !quietModals){ void box.offsetWidth; box.classList.add(dir === 'prev' ? 'slide-prev' : 'slide-next'); // «quick»: tecla premida, sem animação
+      slideT = setTimeout(() => box.classList.remove('slide-next', 'slide-prev'), 450); } // se a animação não chegar ao fim (janela escondida), a classe sai na mesma
+    const f = box.querySelector('[data-nav="' + k + '"]:not(:disabled)') || box.querySelector('.ft-arrow[data-nav="' + k.replace(/-\d+$/, '') + '"]:not(:disabled)') || box.querySelector('.ft-arrow:not(:disabled)');
+    if (f) f.focus({preventScroll:true});
+    return true;
+  };
+  /* uma Cena da fita leva a essa Cena; uma seta segue em frente pela linha — e só pergunta quando há vários caminhos e nenhum é em frente */
+  const act = (k, anchor, quick) => {
+    const t = to[k]; if (!t) return false;
+    if (t.id) return go(t.id, k, t.dir, quick);
+    const ahead = t.list.length === 1 ? t.list[0] : t.list.find(x => x.kind === 'arc' || x.kind === 'narr');
+    if (ahead) return go(ahead.id, k, t.dir, quick);
+    if (!t.list.length || !anchor) return false;
+    const rc = anchor.getBoundingClientRect(), lab = x => { const sc = state.scenes[x.id], y = arcById(sc.arcId); return (sc.title || _('Sem título')) + (y ? ' · ' + y.name : ''); };
+    showMenu(rc.left, rc.bottom + 4, t.list.map(x => ({label:lab(x), action:() => go(x.id, k, t.dir)}))); return true;
+  };
+  box.addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (b && !b.disabled) act(b.dataset.nav, b); }); // as Cenas da fita e as setas
+  box.addEventListener('animationend', e => { if (e.target === box) box.classList.remove('slide-next', 'slide-prev'); });
+  m.sceneNav = (track, dir, quick) => act(track + '-' + dir, box.querySelector('.ft-arrow[data-nav="' + track + '-' + dir + '"]'), quick);
+  const drawFita = () => { const sc = state.scenes[id]; if (!sc) return; const wide = fitaWide(), ft = sceneFita(sc, wide); to = ft.to; fita.replaceChildren(...ft.rows); sides.replaceChildren(...ft.sides); box.classList.toggle('ft-wide', wide); };
+  m.fitaFit = () => { if (box.classList.contains('ft-wide') !== fitaWide()) drawFita(); }; // ao mudar o tamanho da janela, as setas mudam de sítio
   const draw = () => {
     const s = state.scenes[id]; if (!s) return closeFicha(m);
+    drawFita();
     const arc = arcById(s.arcId), pos = findScenePos(id), nm = narrIndexMap();
     body.innerHTML = '';
-    m.titleEl.innerHTML = ''; m.titleEl.append(h('span', {class:'dot', style:{background:arcStroke(arc), width:'14px', height:'14px'}}), h('span', {class:'grow-t'}, _('Ficha da Cena')), sceneNav(s, m));
+    m.titleEl.innerHTML = ''; m.titleEl.append(h('span', {class:'dot', style:{background:arcStroke(arc), width:'14px', height:'14px'}}), _('Ficha da Cena'));
     const charInp = h('input', {class:'inp', placeholder:_('Adicionar Personagem…'), style:{width:'200px'}});
     autocomplete(charInp, () => state.characters.filter(c => !s.chars.includes(c.id)).map(c => ({id:c.id, label:c.name})),
       it => { s.chars.push(it.id); touch(); draw(); },

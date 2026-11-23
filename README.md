@@ -28,6 +28,8 @@ Available in **English, Português, Español and Français**. The first time it 
 
 **Details and lists** — Scene, Book, Story Arc, Character, Scenery and Reference details, all linked; lists with filters; References (documents, links, audio, video, notes) stored on the device.
 
+**Stepping through the story** — Scene details open with a route strip: two thick lines, as on the board, linking the previous and next Scene in the book (white) and in the Story Arc (the Arc's colour), with branches and convergences drawn. Click a Scene on the strip, use the round arrows beside the details, or press ← → (with Shift, along the Story Arc); the details slide to the next Scene without closing.
+
 **Projects** — several open at once, save to and open from a file, automatic saving of every change, undo/redo up to 100 steps.
 
 **Writing Guide** — a reference library rebuilt for each language (not just translated): narrator types, figures of speech, style, narrative devices and techniques, planning methods, genres and movements, spelling, punctuation (including *when to use what*), grammar and older forms of the language. The spelling sections include searchable **word lists** of what changed in each spelling reform (for Portuguese: 1911, 1945, 1973 and 1990).

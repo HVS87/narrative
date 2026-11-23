@@ -725,20 +725,75 @@ body.ul-links a,body.ul-links .linkish{text-decoration:underline;text-underline-
 #langBtn{display:none;font-size:12.5px;font-weight:700;letter-spacing:.5px;width:auto;min-width:38px;padding:0 8px;border:1.5px solid var(--border);border-radius:10px;height:32px;margin-right:4px}
 body.no-project #langBtn{display:inline-flex;align-items:center;justify-content:center}
 .lang-menu .ctx-item{font-variant-numeric:tabular-nums}
-/* ficha da Cena: percorrer as Cenas — par branco (Ordem Narrativa) e par da cor do Arco Narrativo (Ordem Cronológica) */
-.modal-title:has(.scn-nav){flex:1;flex-wrap:wrap;row-gap:6px}
-.modal-title .grow-t{min-width:0}
-.scn-nav{display:inline-flex;align-items:center;gap:10px;margin-left:auto;margin-right:4px}
-.scn-pair{display:inline-flex;gap:4px}
-.scn-btn{width:32px;height:32px;border-radius:50%;border:0;padding:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:filter .15s,transform .15s,box-shadow .15s;color:#15171c}
-.scn-btn .nic svg{width:20px;height:20px;stroke-width:2.2}
-.scn-btn.narr{background:var(--narr);box-shadow:inset 0 0 0 1.5px var(--border-strong)}
-.scn-btn.arc{background:var(--arc,#999)}
-.scn-btn:hover:not(:disabled){filter:brightness(.92);box-shadow:0 1px 4px var(--shadow)}
-.scn-btn.narr:hover:not(:disabled){box-shadow:inset 0 0 0 1.5px var(--border-strong),0 1px 4px var(--shadow)}
-.scn-btn:active:not(:disabled){transform:scale(.94)}
-.scn-btn:disabled{opacity:.28;cursor:default}
-.scn-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-/* bifurcação e convergência: além do símbolo, um anel à volta (não depende só da cor) */
-.scn-btn.fork,.scn-btn.merge{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--arc,#999)}
-@media (max-width:420px){ .scn-btn{width:30px;height:30px} .scn-nav{gap:6px} }
+/* ---------- ficha da Cena: a fita do percurso e as setas ----------
+   No topo da ficha, duas linhas grossas, como as do quadro: a branca (Ordem Narrativa) e a da cor do Arco Narrativo.
+   Cada linha liga a Cena anterior à posição desta Cena e à Cena seguinte, e acaba nas caixas dessas Cenas; as bifurcações
+   e as convergências desenham-se por baixo, com um cotovelo na cor do outro Arco.
+   As setas ficam fora da ficha, a meio da altura, quando há margem (.ft-wide); sem margem, nas pontas de cada linha. */
+.scn-fita{--ft-h:24px;--ft-line:6px;--ft-gap:12px;--ft-seg:20px;--ft-row:calc(var(--ft-h) + 4px);display:grid;gap:var(--ft-gap);margin:0 0 8px;padding:2px 14px}
+.ft-wide .scn-fita{--ft-gap:8px;padding-inline:20px}
+.ft-trk{--line:var(--arc-line,#999);display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr) auto;align-items:start}
+.ft-trk.narr{--line:var(--narr)}
+.ft-wide .ft-trk{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+.ft-c{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0}
+.ft-c.prev{align-items:flex-end}
+.ft-c.next{align-items:flex-start}
+.ft-node{position:relative;z-index:1;max-width:100%;height:var(--ft-h);padding:0 9px;border:0;border-radius:8px;background:var(--arc,#999);color:#15171c;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;box-shadow:0 1px 2px var(--shadow)}
+.ft-node>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;line-height:var(--ft-h)}
+.ft-node:hover{filter:brightness(1.07)}
+/* bifurcação e convergência: a Cena do outro caminho fica por baixo, ligada à linha por um cotovelo na cor do seu Arco */
+.ft-node.alt::before{content:"";position:absolute;top:calc((var(--ft-h) - var(--ft-line))/2 - var(--i) * var(--ft-row));width:12px;height:calc(var(--i) * var(--ft-row) + var(--ft-line));border:0 solid var(--arc-line,#999);border-bottom-width:var(--ft-line);pointer-events:none}
+.ft-c.next .ft-node.alt::before{right:100%;border-left-width:var(--ft-line);border-radius:0 0 0 12px}
+.ft-c.prev .ft-node.alt::before{left:100%;border-right-width:var(--ft-line);border-radius:0 0 12px 0}
+/* a posição desta Cena, com um troço de linha para cada lado: cada troço acaba na caixa da Cena que liga */
+.ft-here{position:relative;z-index:1;height:var(--ft-h);margin:0 var(--ft-seg);display:inline-flex;align-items:center;padding:0 9px;border-radius:999px;background:var(--surface);border:2px solid var(--line);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:default}
+.ft-here::before,.ft-here::after{content:"";position:absolute;top:50%;width:calc(var(--ft-seg) + 2px);height:var(--ft-line);margin-top:calc(var(--ft-line)/-2);background:var(--line)}
+.ft-here::before{right:100%}
+.ft-here::after{left:100%}
+.ft-trk.no-prev .ft-here::before,.ft-trk.no-next .ft-here::after{display:none}
+.ft-trk.narr .ft-here{box-shadow:0 0 0 2px var(--narr-case)}
+.ft-trk.narr .ft-here::before,.ft-trk.narr .ft-here::after{box-shadow:0 2px 0 var(--narr-case),0 -2px 0 var(--narr-case)}
+.ft-short{display:none}
+.ft-end{position:relative;z-index:1;height:var(--ft-h);max-width:100%;display:inline-flex;align-items:center;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* as setas: redondas; brancas na Ordem Narrativa, da cor do Arco no Arco Narrativo (e a misturar as cores, onde os Arcos se separam ou se juntam) */
+.ft-arrow{position:relative;width:32px;height:32px;margin:calc((var(--ft-h) - 32px)/2) 0;border-radius:50%;border:0;padding:0;flex:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#15171c;background-color:var(--arc,#999);box-shadow:0 1px 4px var(--shadow);transition:scale .12s}
+.ft-arrow .nic svg{width:20px;height:20px;stroke-width:2.2}
+.ft-arrow.narr{background-color:var(--narr);box-shadow:inset 0 0 0 1.5px var(--border-strong),0 1px 4px var(--shadow)}
+.ft-trk .ft-arrow.prev{margin-right:8px}
+.ft-trk .ft-arrow.next{margin-left:8px}
+.ft-arrow:hover:not(:disabled){scale:1.07}
+.ft-arrow:active:not(:disabled){scale:.94}
+.ft-arrow:disabled{opacity:.35;cursor:default;box-shadow:none}
+.ft-arrow.narr:disabled{box-shadow:inset 0 0 0 1.5px var(--border-strong)}
+:is(.ft-arrow,.ft-node):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* com margem: as setas saem da ficha e ficam a meio da altura da janela, de cada lado, sempre no mesmo sítio — a do livro maior, a do Arco por baixo */
+.ft-sides{position:sticky;top:50%;height:0;z-index:4}
+.ft-side{position:absolute;top:0;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:10px}
+.ft-side.prev{right:calc(100% + 21px)}
+.ft-side.next{left:calc(100% + 21px)}
+.ft-side .ft-arrow{width:36px;height:36px;margin:0}
+.ft-side .ft-arrow .nic svg{width:22px;height:22px}
+.ft-side .ft-arrow.narr{width:44px;height:44px}
+.ft-side .ft-arrow.narr .nic svg{width:26px;height:26px}
+/* ao passar a outra Cena, a caixa da ficha desliza do lado de onde se vem; as setas ficam paradas, para se poder clicar de seguida */
+.modal.slide-next{animation:ficha-next .22s cubic-bezier(.2,.8,.2,1)}
+.modal.slide-prev{animation:ficha-prev .22s cubic-bezier(.2,.8,.2,1)}
+.slide-next .ft-arrow{animation:ft-hold-next .22s cubic-bezier(.2,.8,.2,1)}
+.slide-prev .ft-arrow{animation:ft-hold-prev .22s cubic-bezier(.2,.8,.2,1)}
+:is(.slide-next,.slide-prev) :is(.modal-head,.ficha,.ft-c,.ft-here){animation:ficha-fade .22s ease-out}
+@keyframes ficha-next{from{transform:translateX(20px)}}
+@keyframes ficha-prev{from{transform:translateX(-20px)}}
+@keyframes ft-hold-next{from{translate:-20px 0}}
+@keyframes ft-hold-prev{from{translate:20px 0}}
+@keyframes ficha-fade{from{opacity:.3}}
+/* telemóvel: a fita, com as setas nas pontas, fica fixa em baixo, junto do polegar */
+@media (max-width:699px), (max-height:520px) and (orientation:landscape){
+  .modal.scene-modal{display:flex;flex-direction:column;padding-bottom:0}
+  .scene-modal .ficha{flex:1 0 auto}
+  .scene-modal .scn-fita{--ft-seg:14px;order:2;position:sticky;bottom:0;z-index:3;margin:0;padding:10px max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -6px 16px var(--shadow)}
+  .scene-modal .ft-node{padding:0 7px}
+  .scene-modal .ft-long{display:none}
+  .scene-modal .ft-short{display:inline}
+  .scene-modal .ft-trk .ft-arrow.prev{margin-right:6px}
+  .scene-modal .ft-trk .ft-arrow.next{margin-left:6px}
+}

@@ -63,7 +63,7 @@ function a11yCard(){
     h('div', {class:'field'}, h('label', null, _('Cores dos Arcos Narrativos')),
       h('p', {class:'muted small', style:{margin:'0 0 6px'}}, _('Os Arcos Narrativos novos já recebem cores escolhidas para se distinguirem com qualquer tipo de daltonismo. Pode aplicar a mesma sequência aos Arcos Narrativos deste projeto (pode ser anulado).')),
       h('button', {class:'btn', onclick:() => { recolorArcs(); commit(); toast(_('Cores dos Arcos Narrativos atualizadas.')); }}, _('Aplicar cores seguras para daltonismo'))),
-    h('p', {class:'muted small'}, _('Atalhos: Tab percorre os botões, Enter ou Espaço ativam, Esc fecha janelas e menus, Ctrl+Z anula e Ctrl+Shift+Z refaz. O quadro também se lê em Lista, botão a botão, com leitor de ecrã.')));
+    h('p', {class:'muted small'}, _('Atalhos: Tab percorre os botões, Enter ou Espaço ativam, Esc fecha janelas e menus, Ctrl+Z anula e Ctrl+Shift+Z refaz. Na ficha de uma Cena, ← e → passam à Cena anterior e à seguinte do livro e, com Shift, às do Arco Narrativo. O quadro também se lê em Lista, botão a botão, com leitor de ecrã.')));
 }
 matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', applyA11y);
 matchMedia('(prefers-contrast: more)').addEventListener('change', applyA11y);
@@ -75,7 +75,6 @@ function welcomeIfNeeded(){
   const body = h('div', {class:'modal-body welcome'},
     h('p', {class:'privacy-main'}, privacyText()), h('p', {class:'muted small'}, privacyDetail()),
     h('div', {class:'field'}, h('label', null, _('Língua')), langPicker()),
-    h('p', {class:'muted small'}, _('Este aviso fica sempre disponível no fim das Definições.')),
     h('div', {class:'modal-foot'}, h('button', {class:'btn primary', onclick:done}, _('Começar'))));
   const m = openModal({title:_('Bem-vindo ao Narrative'), body, cls:'welcome-modal', onClose:() => lsSet(LS_PRIV, '1')});
   setTimeout(() => { const b = body.querySelector('.btn.primary'); b && b.focus(); }, 0);
