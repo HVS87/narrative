@@ -87,9 +87,9 @@ const Dual = {
       : s.kind === 'arc' ? [...document.querySelectorAll('.lane-label')].find(x => x.dataset.arc === s.id) : null;
     if (!el) return; el.classList.add('sel2');
     const c = scroll && s.kind === 'scene' && target['s:' + s.id]; if (!c) return;
-    const sc = $('#board-scroll'), vx = c.x - sc.scrollLeft, vy = c.y - sc.scrollTop, to = {behavior:'smooth'};
-    if (vx < B.GUT + 8 || vx + B.SW > sc.clientWidth - 8) to.left = c.x - (sc.clientWidth + B.GUT - B.SW) / 2;
-    if (vy < 0 || vy + B.SH > sc.clientHeight - HEAD_H) to.top = c.y - (sc.clientHeight - HEAD_H - B.SH) / 2;
+    const sc = $('#board-scroll'), z = Z(), vx = c.x * z - sc.scrollLeft, vy = c.y * z - sc.scrollTop, to = {behavior:'smooth'};
+    if (vx < (B.GUT + 8) * z || vx + B.SW * z > sc.clientWidth - 8) to.left = (c.x - B.GUT / 2 + B.SW / 2) * z - sc.clientWidth / 2;
+    if (vy < 0 || vy + B.SH * z > sc.clientHeight - HEAD_H * z) to.top = (c.y + HEAD_H / 2 + B.SH / 2) * z - sc.clientHeight / 2;
     if ('left' in to || 'top' in to) sc.scrollTo(to);
   }
 };
@@ -106,8 +106,9 @@ function openAny(en){
   const orig = window[fn];
   window[fn] = function(id, ...rest){
     if (Dual.redirect(kind, id, rest[0])) return;
+    dockBefore(); // com «ficha ao lado», a ficha do painel dá lugar à que se abre a partir do quadro
     const n = openModals.length, r = orig(id, ...rest);
-    if (openModals.length > n) openModals[openModals.length - 1].entity = {kind, id};
+    if (openModals.length > n){ const m = openModals[openModals.length - 1]; m.entity = {kind, id}; dockAfter(m); }
     Dual.report(); return r;
   };
 });

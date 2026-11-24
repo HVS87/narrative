@@ -1,6 +1,8 @@
 'use strict';
 /* ===== Visitas guiadas (a principal e a detalhada): correm sobre um projeto de demonstração, nunca tocam nos dados reais ===== */
-const Tour = { active:false, i:0, token:0, saved:null, poll:null, steps:null };
+const Tour = { active:false, i:0, token:0, saved:null, poll:null, steps:null, paused:null, exploreId:null, back:null };
+/* tudo o que um Tomo ou um Capítulo leva consigo ao ser arrastado (para as simulações) */
+const tourKeys = (kind, id) => { const out = [kind[0] + ':' + id]; if (kind === 'book') bookById(id).chapters.forEach(c => { out.push('c:' + c.id); c.scenes.forEach(s => out.push('s:' + s)); }); else findChapter(id).chapter.scenes.forEach(s => out.push('s:' + s)); return out; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const scrollBoard = x => { const sc = $('#board-scroll'); sc.scrollLeft = x === 'end' ? sc.scrollWidth : x; sc.scrollTop = 0; };
 
@@ -30,24 +32,28 @@ async function simLink(tk, from, to){
 
 const TOUR_STEPS = [
   { title:_('Bem-vindo ao Narrative'),
-    text:_('Esta visita usa um projeto de demonstração: tudo o que vê é simulado e nada é registado ou alterado nos seus dados. Pode terminar a qualquer momento com «Terminar visita» ou com a tecla Esc.') },
+    text:_('Esta visita usa um projeto de demonstração — um livro com dois Tomos, doze Capítulos, vinte Personagens e quinze Localizações: tudo o que vê é simulado e nada é registado ou alterado nos seus dados. Em qualquer passo, «Explorar o projeto» deixa-o mexer nesse livro à vontade, com a visita em pausa, à espera. Pode terminar a qualquer momento com «Terminar visita» ou com a tecla Esc.') },
   { sel:'#projBtn', title:_('Projetos'),
     text:_('O nome do projeto, na barra de topo, abre a lista dos projetos abertos: pode ter vários e alternar entre eles. Na mesma lista cria um Novo Projeto, abre um projeto guardado num ficheiro (Abrir Projeto), grava o atual num ficheiro (Guardar Projeto) ou fecha-o. Sem projetos abertos, aparece a página inicial.') },
   { sel:'#rail', title:_('Áreas e Criar'), when:() => navMode() !== 'bottom',
-    text:_('À esquerda estão as áreas da ferramenta: a Narrativa (o quadro), o Plano (Calendarização e Objetivos), os Tomos, Arcos Narrativos, Personagens e Cenários, as Referências e os Materiais de Apoio. O botão Criar, no topo, cria o que precisar a partir de qualquer área: uma Cena, um Capítulo, um Tomo, um Arco Narrativo, uma Personagem, um Cenário, uma Nota, uma Referência ou um objetivo de pesquisa.') },
+    text:_('À esquerda estão as áreas da ferramenta: a Narrativa (o quadro), o Plano (Calendarização e Objetivos), os Tomos e Capítulos, os Arcos Narrativos, as Personagens e as Localizações, as Referências e os Materiais de Apoio. O botão Criar, no topo, cria o que precisar a partir de qualquer área: uma Cena, um Capítulo, um Tomo, um Arco Narrativo, uma Personagem, uma Localização, uma Nota, uma Referência ou um objetivo de pesquisa.') },
   { sel:'#bnav', title:_('Áreas e Criar'), when:() => navMode() === 'bottom',
-    text:_('Em baixo estão as áreas: a Narrativa, o Plano (Calendarização e Objetivos), os Elementos (Tomos, Arcos Narrativos, Personagens e Cenários), as Referências e Mais (Materiais de Apoio, Definições e as visitas). O botão redondo, no canto, cria uma Nota, uma Cena ou qualquer outra coisa.') },
+    text:_('Em baixo estão as áreas: a Narrativa, o Plano (Calendarização e Objetivos), os Elementos (Tomos e Capítulos, Arcos Narrativos, Personagens e Localizações), as Referências e Mais (Materiais de Apoio, Definições e as visitas). O botão redondo, no canto, cria uma Nota, uma Cena ou qualquer outra coisa.') },
   { sel:'.book-head[data-book="b1"]', title:_('Tomos'),
     text:_('Tal como os dias num calendário, cada Tomo é uma coluna. Clique no nome para o alterar, em ⓘ para abrir a ficha do Tomo e em + para lhe acrescentar um Capítulo. A largura adapta-se ao conteúdo.') },
   { sel:'.add-book', setup:() => scrollBoard('end'), title:_('Novo Tomo'), text:_('O pequeno botão «+» no fim da linha de cabeçalhos acrescenta um novo Tomo.') },
   { sel:'.book-head[data-book="b2"]', title:_('Reordenar Tomos'),
-    text:_('Um clique longo no cabeçalho permite arrastar o Tomo. Os Tomos vizinhos afastam-se para lhe abrir espaço, e ele leva consigo todos os Capítulos e Cenas. Ao largar, é pedida confirmação.'),
-    sim:tk => simStruct(tk, st => st.unshift(st.pop()), ['b:b2', 'c:c4', 'c:c5', 's:s7', 's:s8', 's:s9', 's:s10']) },
+    text:_('Um clique longo no cabeçalho permite arrastar o Tomo. Os Tomos vizinhos afastam-se para lhe abrir espaço, e ele leva consigo todos os Capítulos e Cenas. Ao largar, fica feito — e uma barra, em baixo, oferece «Anular».'),
+    sim:tk => simStruct(tk, st => st.unshift(st.pop()), tourKeys('book', 'b2')) },
   { sel:'.ch-head[data-chapter="c2"]', title:_('Capítulos'),
     text:_('Os Capítulos são blocos arredondados, numerados automaticamente dentro do Tomo. Com um clique longo pode mudá-los de ordem ou até de Tomo — a numeração e a largura dos Tomos ajustam-se sozinhas.'),
-    sim:tk => simStruct(tk, st => { const c = st[0].chapters.splice(1, 1)[0]; st[1].chapters.unshift(c); }, ['c:c2', 's:s4', 's:s5']) },
+    sim:tk => simStruct(tk, st => { const c = st[0].chapters.splice(1, 1)[0]; st[0].chapters.splice(3, 0, c); }, tourKeys('chapter', 'c2')) },
   { sel:'.scene[data-scene="s2"]', title:_('Cenas'),
     text:_('A Cena é a unidade base. A linha branca liga todas as Cenas pela Ordem Narrativa — una e ininterrupta. As linhas coloridas ligam as Cenas de cada Arco Narrativo pela sua Ordem Cronológica (a tracejado quando a cronologia recua). Clique numa Cena para abrir a ficha.') },
+  { sel:'.scene[data-scene="s12"] .scene-st', title:_('Estado de cada Cena'),
+    text:_('O círculo no canto de cada Cena mostra o estado: por escrever, escrita (um visto) ou revista (dois vistos). Um clique avança. Duas linhas verticais — «A escrita vai aqui» e «A revisão vai aqui» — marcam o ponto do livro em que vai, e um relógio vermelho assinala um prazo em atraso. Ao parar o rato numa Cena, vê o resumo, quem lá está e onde.') },
+  { sel:'#boardBar', title:_('Filtros e vistas'),
+    text:_('«Filtrar» destaca as Cenas de uma Personagem, de um POV, de uma Localização ou com um certo estado; as outras esbatem-se, sem sair do lugar. O visto de cada Arco Narrativo, à esquerda, recolhe a sua faixa. No PC, há três vistas — Quadro, Compacta (as Cenas reduzidas a etiquetas) e Lista — e, no canto de baixo do quadro, a ampliação (− 100 % +, «Ajustar») e um mini-mapa da narrativa inteira.') },
   { sel:'#gutter', title:_('Arcos Narrativos e Ramos'),
     text:_('Cada Arco Narrativo ocupa uma faixa horizontal exclusiva, com cor atribuída automaticamente. Os Ramos (divergências) ficam nas faixas imediatamente abaixo do Arco Narrativo de onde partem.') },
   { sel:'.scene[data-scene="s3"]', title:_('Mover Cenas'),
@@ -63,27 +69,29 @@ const TOUR_STEPS = [
     text:_('A última Cena de cada Arco Narrativo tem uma pequena bola na margem direita: arraste-a até uma Cena de outro Arco Narrativo — em qualquer Capítulo ou Tomo — e o Arco Narrativo passa a convergir nela, após confirmação. Também funciona com um clique longo do botão direito. Em alternativa, escolha «Criar convergência…» no menu da Cena e indique a Cena de destino.'),
     sim:tk => simLink(tk, 's7', 's9') },
   { sel:'.modal', title:_('Ficha da Cena'), setup:() => openSceneFicha('s2'),
-    text:_('Título, resumo, Arco Narrativo (nunca em branco), POV, Personagens, Cenários, posição na Ordem Narrativa e na Ordem Cronológica, e ainda Notas e Referências associadas. No topo, a fita do percurso mostra, como no quadro, a Cena anterior e a seguinte do livro (linha branca) e as do Arco Narrativo (linha da cor do Arco), com as bifurcações e as convergências desenhadas. Clique numa Cena da fita ou nas setas para lá ir, ou use ← e → (com Shift, pelo Arco).') },
+    text:_('Título, resumo, Arco Narrativo (nunca em branco), POV, Personagens, Localizações, posição na Ordem Narrativa e na Ordem Cronológica, o estado (por escrever, escrita, revista) com os prazos, e ainda Notas e Referências associadas. No topo, a fita do percurso mostra, como no quadro, a Cena anterior e a seguinte do livro (linha branca, Ordem Narrativa) e as do Arco Narrativo (linha da cor do Arco, Ordem Cronológica), com as bifurcações e as convergências desenhadas. Clique numa Cena da fita ou nas setas para lá ir, ou use ← e → (com Shift, pelo Arco). No PC, o botão ao lado do ✕ põe a ficha num painel à direita, com o quadro à vista.') },
   { sel:'.modal', title:_('Ficha do Tomo'), setup:() => openBookFicha('b1'),
     text:_('Nome, cor do Tomo (que o distingue no quadro e nas listas), tipo de narrador (com ligação aos Materiais de Apoio) e a lista automática de Personagens: primeiro as Personagens Principais, depois as Secundárias, com POV, género e idade. «Marcar como principal» só afeta este Tomo.') },
   { sel:'#view-page', tab:'plan', title:_('Calendarização e Objetivos'),
-    text:_('Três fases — Pesquisa e Planeamento, Escrita e Revisão — com prazos e percentagens de conclusão. Marque as Cenas escritas e revistas (aqui ou na ficha de cada Cena): os Capítulos e os Tomos completam-se sozinhos. Crie objetivos de pesquisa (livros, mapas, locais, entrevistas, podcasts…) com data e Referências, veja tudo num calendário e exporte para o Google Calendar, o Apple Calendar ou o Outlook / Teams.') },
-  { sel:'#view-page', tab:'books', title:_('Separador Tomos'), text:_('Lista de todos os Tomos, com filtros por Personagem e por Arco Narrativo (pesquisa com sugestão automática). Clique num Tomo para abrir a ficha.') },
+    text:_('No topo, os cartões «a seguir»: a próxima Cena a escrever e a rever, o próximo prazo e o próximo objetivo de pesquisa. Depois, três fases — Pesquisa e Planeamento, Escrita e Revisão — numa linha do tempo cujas pontas se arrastam, com percentagens de conclusão. Em «Escrita e Revisão» marcam-se as Cenas escritas e revistas, lado a lado (ou na ficha de cada Cena): os Capítulos e os Tomos completam-se sozinhos. Crie objetivos de pesquisa (livros, mapas, locais, entrevistas, podcasts…) com data e Referências, veja tudo num calendário — em mês ou em agenda — e exporte para o Google Calendar, o Apple Calendar ou o Outlook / Teams.') },
+  { sel:'#view-page', tab:'books', title:_('Separador Tomos e Capítulos'), text:_('Os Tomos e, por baixo, os seus Capítulos, com filtros por Personagem e por Arco Narrativo (pesquisa com sugestão automática). Todas as listas têm procura, ordenação e a escolha entre cartões e linhas; a tira em cada cartão mostra onde esse elemento aparece ao longo da narrativa. Clique num Tomo para abrir a ficha, ou num Capítulo para ir até ele no quadro.') },
   { sel:'.modal', tab:'arcs', title:_('Separador Arcos Narrativos'), setup:() => openArcFicha('a3'),
     text:_('A ficha de um Arco Narrativo mostra as suas Cenas por ordem, com um interruptor entre Ordem Narrativa e Ordem Cronológica (onde pode reordenar por arrasto). Um Ramo mostra também, noutro tom, as Cenas anteriores à divergência.') },
-  { sel:'#view-page', tab:'characters', title:_('Separador Personagens'), text:_('Todas as Personagens, filtráveis por Tomo e por Principais / Secundárias. Na ficha, pode editar atributos, Cenários, Notas e Referências.') },
-  { sel:'#view-page', tab:'sceneries', title:_('Separador Cenários'), text:_('Os lugares e cenários da história. Cada Cenário associa-se a uma ou mais Cenas e a Personagens, e tem as suas próprias Notas e Referências. A lista filtra-se por Personagem.') },
+  { sel:'#view-page', tab:'characters', title:_('Separador Personagens'), text:_('Todas as Personagens, filtráveis por Tomo e por Principais / Secundárias, com as iniciais na cor do Arco Narrativo em que mais aparecem e a tira de presença na narrativa. Na ficha, pode editar atributos, Localizações, Notas e Referências. «Importar» copia Personagens de outro projeto aberto.') },
+  { sel:'#view-page', tab:'sceneries', title:_('Separador Localizações'), text:_('Os lugares da história. Cada Localização associa-se a uma ou mais Cenas e a Personagens, e tem as suas próprias Notas e Referências. Tal como as Personagens, as Localizações são Principais — a casa da protagonista, o lugar onde decorre o grosso da ação — ou Secundárias; quando uma Localização já aparece em três Cenas, a ferramenta sugere marcá-la como principal. A lista filtra-se por Personagem e por Principais / Secundárias.') },
   { sel:'.modal', title:_('Notas'), setup:() => openRefFicha('r3'),
-    text:_('Uma Nota é um texto curto — uma ideia, uma dúvida, uma pesquisa — que se associa a um ou mais Tomos, Cenas, Arcos Narrativos, Personagens ou Cenários, e aparece na ficha de cada um. Cria-se a partir de qualquer ficha (+ Criar Nota) ou no separador Referências.') },
+    text:_('Uma Nota é um texto curto — uma ideia, uma dúvida, uma pesquisa — que se associa a um ou mais Tomos, Cenas, Arcos Narrativos, Personagens ou Localizações, e aparece na ficha de cada um. Cria-se a partir de qualquer ficha (+ Criar Nota) ou no separador Referências.') },
   { sel:'#createFab', title:_('Criar num toque'), when:() => navMode() === 'bottom', setup:() => { $('#createFab').hidden = false; },
-    text:_('No telemóvel, o botão redondo no canto abre o Criar: a Nota vem em primeiro lugar, para não perder uma ideia; a seguir, Cena, Capítulo, Tomo, Arco Narrativo, Personagem, Cenário, Referência e objetivo de pesquisa.') },
+    text:_('No telemóvel, o botão redondo no canto abre o Criar: a Nota vem em primeiro lugar, para não perder uma ideia; a seguir, Cena, Capítulo, Tomo, Arco Narrativo, Personagem, Localização, Referência e objetivo de pesquisa.') },
   { sel:'#narrList', title:_('A Narrativa em Lista'), when:() => navMode() === 'bottom', setup:() => { Narr.tourList = true; renderAll(); },
     text:_('Com o telemóvel ao alto, a Narrativa abre em Lista: Tomos, Capítulos e Cenas pela Ordem Narrativa, com a cor do Arco Narrativo e o estado da escrita. Toque numa Cena para abrir a ficha, ou toque longo para mais opções. O botão Quadro, no topo, mostra o quadro — e rodar o telemóvel também.') },
-  { sel:'#view-page', tab:'refs', title:_('Referências'), text:_('O repositório do projeto: Documents, Links, Audio, Video e Notas, guardados localmente. «Nova Referência» abre uma janela que também aceita ficheiros arrastados do ambiente de trabalho.') },
+  { sel:'#view-page', tab:'refs', title:_('Referências'), text:_('O repositório do projeto: Documents, Links, Audio, Video e Notas, guardados localmente. «+ Novo» cria uma Nota ou abre uma janela que também aceita ficheiros arrastados do ambiente de trabalho; «Importar» copia Referências de outro projeto aberto.') },
   { sel:'#view-page', tab:'support', title:_('Materiais de Apoio'), text:_('Fichas de consulta em onze secções — tipos de narrador, figuras de estilo, recursos estilísticos, estilos narrativos, recursos narrativos, técnicas, métodos, ortografia, pontuação, sintaxe e escrita antiga —, com exemplos, pesquisa e ligações entre fichas. Os tipos de narrador abrem-se também a partir da ficha de cada Tomo.') },
   { sel:'.settings', tab:'settings', title:_('Definições do Projeto'), text:_('A roda dentada, no canto superior direito (no telemóvel, em Mais), abre as Definições. Dê um nome ao projeto; guarde-o num ficheiro, abra outro ou feche-o; ligue o telemóvel ao PC; escolha ou gere paletas de cores (todas com contraste verificado); instale a ferramenta como app, que se atualiza sozinha; ligue ou desligue os explicadores; e repita as visitas quando quiser.') },
+  { sel:'#searchBtn', title:_('Pesquisa e atalhos'),
+    text:_('A pesquisa (tecla / ou Ctrl K) procura em todo o projeto — Cenas, Capítulos, Personagens, Localizações, Arcos Narrativos, Referências — e nos Materiais de Apoio, e aceita ações, como «nova personagem» ou «tema claro». A tecla ? mostra os atalhos de teclado e F1 procura só nos Materiais de Apoio.') },
   { sel:'.hist', title:_('Anular, refazer e gravação automática'),
-    text:_('↶ anula a última alteração e ↷ refaz o que anulou (Ctrl+Z e Ctrl+Shift+Z), até 100 passos — no telemóvel, estão no menu ⋮. Cada alteração fica gravada neste dispositivo no momento em que é feita — o indicador ao lado confirma-o — e está cá quando voltar a abrir a ferramenta. «Guardar Projeto» grava-o também num ficheiro; um ● junto ao nome do projeto indica alterações ainda por guardar em ficheiro.') },
+    text:_('Mover e eliminar uma coisa de cada vez não pedem confirmação: fica feito e uma barra, em baixo, oferece «Anular». ↶ anula a última alteração e ↷ refaz o que anulou (Ctrl+Z e Ctrl+Shift+Z), até 100 passos — no telemóvel, estão no menu ⋮. Cada alteração fica gravada neste dispositivo no momento em que é feita — o indicador ao lado confirma-o — e está cá quando voltar a abrir a ferramenta. «Guardar Projeto» grava-o também num ficheiro; um ● junto ao nome do projeto indica alterações ainda por guardar em ficheiro.') },
   { sel:'#tip', title:_('Explicadores'), when:() => !coarse(),
     setup:() => { const el = $('.scene[data-scene="s2"]'), r = el.getBoundingClientRect(); Tips.x = r.left + 20; Tips.y = r.top + 30; showTip(tipFor(el)); },
     text:_('Pare o rato sobre qualquer elemento — um botão, um campo, uma Cena — e aparece uma breve explicação do que faz. Podem desligar-se nas Definições do Projeto.') },
@@ -93,14 +101,16 @@ const TOUR_STEPS = [
     text:_('Ligue o telemóvel ao PC uma vez — um mostra um código de 6 caracteres e o outro escreve-o — e, sempre que a ferramenta estiver aberta nos dois, o projeto passa a ser o mesmo nos dois, incluindo os ficheiros das Referências. Os dados viajam cifrados.') },
   { title:_('Telemóvel e tablet'),
     text:_('Num ecrã tátil, um toque faz de clique e um toque longo faz de clique longo e de botão direito: toque longo e arraste para mover; toque longo e largue para abrir o menu. A ferramenta adapta-se à orientação do dispositivo e pode ser instalada como app — no ecrã principal — a partir das Definições do Projeto (ou do menu ⋮).') },
-  { title:_('Fim da visita'), offerDeep:true, text:_('A demonstração vai desaparecer e o seu projeto volta, exatamente como estava. Comece por criar a primeira Cena com o botão Criar, ou dentro de um Capítulo, no quadro. Quer conhecer cada funcionalidade em pormenor? A visita detalhada mostra o que ficou por ver. Boa escrita!') }
+  { title:_('Fim da visita'), offerDeep:true, text:_('A demonstração vai desaparecer e o seu projeto volta, exatamente como estava. Comece por criar a primeira Cena com o botão Criar, ou dentro de um Capítulo, no quadro — ou, na página inicial, comece de um modelo de estrutura ou do exemplo. Quer conhecer cada funcionalidade em pormenor? A visita detalhada mostra o que ficou por ver. Boa escrita!') }
 ];
 
 /* Visita detalhada: funcionalidade a funcionalidade, para quem já fez a primeira */
 const TOUR_DEEP = [
   { title:_('Visita detalhada'), text:_('Esta visita percorre cada funcionalidade em pormenor, também sobre o projeto de demonstração e sem alterar nada nos seus dados. Use as setas do teclado (ou «Seguinte») para avançar e Esc para terminar.') },
   { sel:'.modal', title:_('Ficha da Cena: quem e onde'), setup:() => openSceneFicha('s2'),
-    text:_('O Arco Narrativo é obrigatório (mudá-lo leva a Cena para a faixa desse Arco Narrativo). O POV é a Personagem pelo olhar de quem a Cena é contada; as Personagens e os Cenários escolhem-se com sugestão automática — e, se o nome não existir, cria-se ali mesmo. O título e o resumo gravam-se enquanto escreve.') },
+    text:_('O Arco Narrativo é obrigatório (mudá-lo leva a Cena para a faixa desse Arco Narrativo). O POV é a Personagem pelo olhar de quem a Cena é contada; as Personagens e as Localizações escolhem-se com sugestão automática — e, se o nome não existir, cria-se ali mesmo. O título e o resumo gravam-se enquanto escreve.') },
+  { sel:'.modal', title:_('Ficha ao lado e em duas colunas'), when:() => !coarse(), setup:() => openSceneFicha('s2'),
+    text:_('No PC, numa janela larga, a ficha tem duas colunas: à esquerda o que se escreve, à direita o progresso, as Notas e as Referências; cada secção abre e fecha e mostra quantos itens tem. O botão ao lado do ✕ passa a ficha para um painel à direita: o quadro continua à vista e utilizável, a Cena aberta fica assinalada e abrir outra Cena substitui a do painel. A escolha fica lembrada.') },
   { sel:'.posbox', title:_('Ficha da Cena: posição'), setup:() => { openSceneFicha('s5'); const p = $('.posbox'); p && p.scrollIntoView({block:'center'}); },
     text:_('A Ordem Narrativa é a posição da Cena no livro (Tomo › Capítulo › Cena); a Ordem Cronológica é a posição dentro do seu Arco Narrativo, que pode ser diferente — é assim que se escrevem analepses. Ambas se mudam aqui ou arrastando no quadro.') },
   { sel:'.ctx-menu', title:_('Ramos'), setup:() => { const r0 = $('.scene[data-scene="s2"]').getBoundingClientRect(); showMenu(r0.right - 30, r0.bottom - 10, [{label:_('Criar nova Cena aqui')}, {label:_('Criar nova Cena num novo Ramo')}, '-', {label:_('Abrir ficha da Cena')}, {label:_('Criar convergência…')}]); },
@@ -108,13 +118,17 @@ const TOUR_DEEP = [
   { sel:'.modal', tab:'arcs', title:_('Ordem Cronológica'), setup:() => openArcFicha('a1'),
     text:_('Na ficha do Arco Narrativo, o interruptor alterna entre a Ordem Narrativa e a Ordem Cronológica. Na cronológica, um clique longo numa Cena permite arrastá-la para outra posição no tempo; no quadro, as linhas a tracejado mostram onde a cronologia recua.') },
   { sel:'.modal', tab:'characters', title:_('Ficha da Personagem'), setup:() => openCharFicha('ch1'),
-    text:_('Nome, género, idade e descrição; os Tomos em que figura (principal ou secundária em cada um — «Marcar como principal» só afeta esse Tomo); os Cenários a que está associado e os das Cenas em que aparece; e as suas Notas e Referências.') },
-  { sel:'.modal', tab:'sceneries', title:_('Ficha do Cenário'), setup:() => openSceneryFicha('sc1'),
-    text:_('Um Cenário reúne as Personagens que lhe estão associadas, as que aparecem nas suas Cenas, as Cenas onde decorre (com a posição de cada uma) e as Notas e Referências. Elimina-se sem afetar as Cenas.') },
+    text:_('Nome, género, idade e descrição; os Tomos em que figura (principal ou secundária em cada um — «Marcar como principal» só afeta esse Tomo); as Localizações a que está associada e as das Cenas em que aparece; e as suas Notas e Referências.') },
+  { sel:'.modal', tab:'sceneries', title:_('Ficha da Localização'), setup:() => openSceneryFicha('sc1'),
+    text:_('Uma Localização reúne as Personagens que lhe estão associadas, as que aparecem nas suas Cenas, as Cenas que nela decorrem (com a posição de cada uma) e as Notas e Referências. Elimina-se sem afetar as Cenas.') },
+  { sel:'.loc-seg', tab:'sceneries', title:_('Localizações principais e secundárias'),
+    text:_('Marque como Localização Principal os lugares onde decorre o grosso da ação; os restantes ficam como secundários. A estrela aparece nas fichas das Cenas, e a lista filtra-se por umas e outras. Quando uma Localização por marcar já aparece em três Cenas, surge a sugestão de a tornar principal — na ficha, na lista e ao associá-la à terceira Cena; «Não, é secundária» encerra o assunto.') },
+  { sel:'.imp-btn', tab:'characters', title:_('Importar de outro projeto'),
+    text:_('«Importar» copia Personagens, Localizações e Referências de outro projeto que esteja aberto — útil numa série, ou num livro novo no mesmo mundo. Escolhe o que quer trazer; o que já existe com o mesmo nome vem assinalado. O outro projeto não é alterado e a importação anula-se de uma vez.') },
   { sel:'.modal', tab:'refs', title:_('Nova Referência'), setup:() => newRefDialog(),
     text:_('Documentos, Links, Audio, Video ou Notas. Os ficheiros — também arrastados do ambiente de trabalho para esta janela — ficam guardados neste dispositivo e seguem com o projeto ao guardá-lo em ficheiro ou ao sincronizar. Imagens, PDF, áudio e vídeo abrem-se na ficha.') },
   { sel:'#view-page .page-head', tab:'books', title:_('Filtros'),
-    text:_('Em Tomos, Arcos Narrativos e Cenários, os filtros sugerem nomes enquanto escreve: escolha uma Personagem, por exemplo, para ver só os Tomos ou Arcos Narrativos em que aparece; o ✕ do filtro mostra tudo outra vez. Em Personagens filtra-se por Tomo e por Principais / Secundárias; em Referências, pelo tipo.') },
+    text:_('Em Tomos e Capítulos, Arcos Narrativos e Localizações, os filtros sugerem nomes enquanto escreve: escolha uma Personagem, por exemplo, para ver só os Tomos ou Arcos Narrativos em que aparece; o ✕ do filtro mostra tudo outra vez. Em Personagens filtra-se por Tomo e por Principais / Secundárias; em Referências, pelo tipo.') },
   { sel:'.modal', title:_('Tipo de narrador'), setup:() => openNarratorFicha('terceira-limitada'),
     text:_('Cada Tomo tem um tipo de narrador. A ficha de cada tipo, nos Materiais de Apoio, explica-o com exemplos; as fichas ligam-se umas às outras e a pesquisa dos Materiais de Apoio encontra-as por qualquer palavra.') },
   { sel:'.swatches', title:_('Cor do Tomo'), setup:() => openBookFicha('b2'),
@@ -128,19 +142,20 @@ const TOUR_DEEP = [
   { sel:'.upd-card', tab:'settings', title:_('Atualizações'), setup:() => { const c = $('.upd-card'); c && c.scrollIntoView({block:'center'}); },
     text:_('A ferramenta procura versões novas sozinha e instala-as num momento em que não esteja a meio de nada, no PC, no telemóvel e no tablet — sem desinstalar nem voltar a instalar. Pode desligar a instalação automática e escolher o momento.') },
   { title:_('Teclado'), when:() => !coarse(),
-    text:_('Esc fecha a janela de cima, cancela um arrasto ou uma convergência em curso e termina esta visita. Ctrl+Z anula e Ctrl+Shift+Z refaz. Enter confirma as janelas de nome. Tab percorre os botões e, nas amostras de cor, as setas mudam de cor. Na ficha de uma Cena, ← e → passam à Cena anterior e à seguinte (com Shift, pelo Arco Narrativo).') },
+    text:_('Esc fecha a janela de cima, cancela um arrasto ou uma convergência em curso e termina esta visita. Ctrl+Z anula e Ctrl+Shift+Z refaz. A tecla / (ou Ctrl K) abre a pesquisa, ? mostra todos os atalhos, F1 procura nos Materiais de Apoio, N cria uma Cena e 1 a 8 mudam de área; no quadro, + e − ampliam e reduzem. Enter confirma as janelas de nome. Tab percorre os botões e, nas amostras de cor, as setas mudam de cor. Na ficha de uma Cena, ← e → passam à Cena anterior e à seguinte (com Shift, pelo Arco Narrativo).') },
   { title:_('Ecrãs táteis'), text:_('Um toque faz de clique; um toque longo e arrastar move Cenas, Capítulos e Tomos; um toque longo sem arrastar abre o menu. Num telemóvel ao alto, a ferramenta sugere rodá-lo para ver mais do quadro; os nomes cortados aparecem inteiros no topo do menu do toque longo.') },
   { title:_('Fim da visita detalhada'), text:_('O seu projeto volta, exatamente como estava. As duas visitas estão sempre disponíveis no botão de ajuda (?) — no telemóvel, em Mais — e nas Definições do Projeto.') }
 ];
 
-function startTour(kind){
+function startTour(kind, at){
   if (Tour.active) return;
+  Tour.paused = null; tourPausedUI();
   flushSave(); closeAllModals(); closeMenu(); endPickLink();
   Tour.kind = kind === 'deep' ? 'deep' : 'basic';
   Tour.steps = (Tour.kind === 'deep' ? TOUR_DEEP : TOUR_STEPS).filter(s => !s.when || s.when()); // só os passos que fazem sentido neste dispositivo
   Tour.saved = { state, tab:activeTab };
   const demo = demoProject(); demo.project.palette = state.project.palette;
-  tourMode = true; Tour.active = true; state = demo; Tour.i = 0;
+  tourMode = true; Tour.active = true; state = demo; Tour.i = Math.max(0, Math.min(Tour.steps.length - 1, at | 0));
   $('#tourBlock').hidden = false; $('#tourSpot').hidden = false; $('#tourPop').hidden = false;
   Tour.poll = setInterval(placeTour, 120); syncInert(); setSaveUI('demo');
   showTourStep();
@@ -176,11 +191,36 @@ function showTourStep(){
     step.sim ? h('p', null, h('button', {class:'btn small', onclick:() => { Tour.token++; linkDrag = null; renderAll(); step.setup && step.setup(); step.sim(Tour.token); }}, _('↻ Repetir simulação'))) : null,
     h('div', {class:'foot'}, h('span', {class:'count'}, (Tour.i + 1) + ' / ' + Tour.steps.length),
       h('button', {class:'btn small', onclick:endTour}, _('Terminar visita')),
+      last ? null : h('button', {class:'btn small tour-explore', onclick:tourExplore}, _('Explorar o projeto')),
       Tour.i > 0 ? h('button', {class:'btn small', onclick:() => { Tour.i--; showTourStep(); }}, _('Anterior')) : null,
       step.offerDeep ? h('button', {class:'btn small', onclick:() => endTour('deep')}, _('Fazer a visita detalhada')) : null,
       h('button', {class:'btn small primary', onclick:() => { if (last) endTour(); else { Tour.i++; showTourStep(); } }}, last ? _('Concluir') : _('Seguinte'))));
   pop.style.transition = 'none'; placeTour(); void pop.offsetHeight; pop.style.transition = ''; // o balão muda de tamanho: salta para o novo lugar em vez de deslizar para fora do ecrã
   step.sim && step.sim(tk);
+}
+/* «Explorar o projeto»: a visita fica em pausa, à espera, e o livro de demonstração abre como um projeto verdadeiro — pode
+   mexer-se em tudo. «Continuar a visita» retoma no mesmo passo; o projeto de exemplo continua aberto (no menu do nome do projeto). */
+function tourExplore(){
+  if (!Tour.active) return;
+  const keep = {kind:Tour.kind, i:Tour.i, n:Tour.steps.length};
+  endTour(); Tour.back = projActive();
+  const open = Tour.exploreId && Projects.idx.open.includes(Tour.exploreId);
+  if (open) projSwitch(Tour.exploreId); else Tour.exploreId = projAdd(sanitize(demoProject()));
+  if (!Tour.exploreId) return; // sem espaço para mais um projeto: a visita termina aqui
+  activeTab = 'board'; renderAll(); Tour.paused = keep; tourPausedUI();
+}
+function tourResume(){
+  const p = Tour.paused; if (!p) return; Tour.paused = null; tourPausedUI();
+  if (Tour.back && Tour.back !== projActive() && Projects.idx.open.includes(Tour.back)) projSwitch(Tour.back);
+  startTour(p.kind, p.i);
+}
+function tourPausedUI(){
+  let el = $('#tourResume'); const p = Tour.paused;
+  if (!p){ if (el) el.remove(); return; }
+  if (!el){ el = h('div', {id:'tourResume', role:'status'}); document.body.append(el); }
+  el.replaceChildren(h('span', {class:'tr-t'}, _('Visita em pausa · passo {n} de {total}', {n:p.i + 1, total:p.n})),
+    h('button', {class:'btn small primary', dataset:{go:'back'}, onclick:tourResume}, _('Continuar a visita')),
+    h('button', {class:'btn small', dataset:{go:'end'}, onclick:() => { Tour.paused = null; tourPausedUI(); }}, _('Terminar visita')));
 }
 function placeTour(){
   if (!Tour.active) return;

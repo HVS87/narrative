@@ -21,6 +21,8 @@ window.__qa = (async () => {
     state = blankProject(); activeTab = 'board';
     Object.assign(filters, { booksChar:null, booksArc:null, charsBook:'', charsRole:'all', arcsChar:null, scnChar:null, refsType:'all', supSec:'narrador', supQ:'' });
     renderAll(); settle(); $('#board-scroll').scrollLeft = 0; $('#board-scroll').scrollTop = 0;
+    View.by = {}; filters.calMode = null; filters.scnRole = 'all'; Tour.paused = null; tourPausedUI(); document.querySelectorAll('.loc-nudge').forEach(x => x.remove()); SecOff.clear(); ListUI.q = {}; ListUI.sort = {}; ListUI.layout = 'cards'; ViewPref.zoom = 1; ViewPref.dens = 'normal'; Narr.view = null; Dock.on = false; Coach.last = Infinity; // filtros, vista, ampliação e dicas: como ao abrir pela primeira vez
+    document.querySelectorAll('.coach').forEach(t => t.remove()); renderAll(); settle();
     histInit(); hideTip(); setTipsOn(true);
   }
   const T = async (name, fn) => { window.__qaLast = name; try { reset(); await fn(); R.push({name, ok:true}); } catch (e) { R.push({name, ok:false, err:String((e && e.message) || e)}); } };
@@ -34,7 +36,7 @@ window.__qa = (async () => {
     const A = newArc('A'), Bq = newArc('B');
     const S = (ch, i, arc, t) => { const s = insertScene(ch.id, i, arc.id); s.title = t; return s; };
     const a1 = S(c1, 0, A, 'a1'), b1 = S(c1, 1, Bq, 'b1'), a2 = S(c1, 2, A, 'a2'), a3 = S(c2, 0, A, 'a3'), b2 = S(c3, 0, Bq, 'b2'), a4 = S(c3, 1, A, 'a4');
-    renderAll(); settle();
+    renderAll(); settle(); histInit(); // o histórico começa aqui: «Anular» não desfaz o cenário de teste
     return { B1, B2, c1, c2, c3, A, Bq, a1, b1, a2, a3, b2, a4 };
   }
   const titles = () => state.books.map(b => b.chapters.map(c => c.scenes.map(i => state.scenes[i].title)));
@@ -60,7 +62,9 @@ window.__qa = (async () => {
   const modals = () => [...document.querySelectorAll('.modal')];
   const topModal = () => modals()[modals().length - 1];
   const btn = (text, root) => [...(root || topModal()).querySelectorAll('button,a.btn')].find(b => b.textContent.includes(text));
-  async function answer(yes){ const m = topModal(); ok(m, 'não apareceu popup de confirmação'); (yes ? m.querySelector('.modal-foot .btn.primary') : btn('Cancelar', m)).click(); await W(30); }
+  const snackEl = () => document.querySelector('.toast.snack');
+  /* confirmações: uma pergunta (janela) ou, para o que se faz logo e se pode anular, a barra com «Anular» */
+  async function answer(yes){ const m = topModal(); if (!(m && btn('Cancelar', m)) && snackEl()){ if (!yes) snackEl().querySelector('.snack-undo').click(); else snackEl().remove(); await W(30); return; } ok(m, 'não apareceu popup de confirmação'); (yes ? m.querySelector('.modal-foot .btn.primary') : btn('Cancelar', m)).click(); await W(30); }
   const setInput = (inp, v) => { inp.value = v; inp.dispatchEvent(new Event('input', {bubbles:true})); };
   const setSelect = (sel, v) => { sel.value = v; sel.dispatchEvent(new Event('change', {bubbles:true})); };
   async function pickAC(inp, text, label){
@@ -162,18 +166,18 @@ window.__qa = (async () => {
     const cx = dropX('scene', f.a1.id, f.c1.id, 2); pe('pointermove', window, cx, r.top + 20);
     eq(L.order.map(i => state.scenes[i].title), ['b1', 'a2', 'a1', 'a3', 'b2', 'a4'], 'pré-visualização');
     pe('pointerup', window, cx, r.top + 20); await W(30);
-    ok(topModal().textContent.includes('Mover a Cena «a1»'), 'texto da confirmação'); await answer(false);
+    ok(!topModal() && snackEl().textContent.includes('Cena «a1» movida'), 'mover não pergunta: avisa e oferece Anular'); await answer(false);
     eq(titles(), [[['a1', 'b1', 'a2'], ['a3']], [['b2', 'a4']]], 'cancelar não altera'); eq(L.order.map(i => state.scenes[i].title)[0], 'a1', 'pré-visualização revertida');
     settle(); await dragTo(sceneEl(f.a1.id), dropX('scene', f.a1.id, f.c1.id, 2)); await answer(true);
     eq(titles(), [[['b1', 'a2', 'a1'], ['a3']], [['b2', 'a4']]]); ok(sceneEl(f.a1.id).textContent.includes('#3'), 'número narrativo atualizado'); layoutInvariants(); });
   await T('C04 arrastar Cena para Capítulo de outro Tomo', async () => { const f = fx();
-    await dragTo(sceneEl(f.a1.id), dropX('scene', f.a1.id, f.c3.id, 1)); ok(topModal().textContent.includes('Tomo 2')); await answer(true);
+    await dragTo(sceneEl(f.a1.id), dropX('scene', f.a1.id, f.c3.id, 1)); ok(snackEl().textContent.includes('Tomo 2')); await answer(true);
     eq(titles(), [[['b1', 'a2'], ['a3']], [['b2', 'a1', 'a4']]]); eq(f.a1.chron, 1, 'a cronologia não muda'); layoutInvariants(); });
   await T('C05 arrastar Cena para Capítulo vazio', async () => { const f = fx(); const c4 = { id:uid('c'), name:'C4', scenes:[] }; f.B2.chapters.push(c4); renderAll(); settle();
     await dragTo(sceneEl(f.a2.id), dropX('scene', f.a2.id, c4.id, 0)); await answer(true); eq(c4.scenes, [f.a2.id]); });
-  await T('C06 largar no mesmo sítio não pede confirmação', async () => { const f = fx(); await dragTo(sceneEl(f.a1.id), dropX('scene', f.a1.id, f.c1.id, 0)); ok(!topModal()); eq(titles()[0][0], ['a1', 'b1', 'a2']); });
+  await T('C06 largar no mesmo sítio não pede confirmação', async () => { const f = fx(); await dragTo(sceneEl(f.a1.id), dropX('scene', f.a1.id, f.c1.id, 0)); ok(!topModal() && !snackEl()); eq(titles()[0][0], ['a1', 'b1', 'a2']); });
   await T('C07 arrastar Capítulo dentro do Tomo renumera', async () => { const f = fx();
-    await dragTo(chHead(f.c2.id), dropX('chapter', f.c2.id, f.B1.id, 0)); ok(topModal().textContent.includes('Capítulo «C2»')); await answer(true);
+    await dragTo(chHead(f.c2.id), dropX('chapter', f.c2.id, f.B1.id, 0)); ok(snackEl().textContent.includes('Capítulo «C2»')); await answer(true);
     eq(f.B1.chapters.map(c => c.name), ['C2', 'C1']); eq(chHead(f.c2.id).querySelector('.ch-num').textContent, '1'); eq(chHead(f.c1.id).querySelector('.ch-num').textContent, '2');
     eq(narrOrder().map(i => state.scenes[i].title), ['a3', 'a1', 'b1', 'a2', 'b2', 'a4']); });
   await T('C08 arrastar Capítulo para outro Tomo leva as Cenas', async () => { const f = fx();
@@ -182,7 +186,7 @@ window.__qa = (async () => {
   await T('C09 arrastar Tomo leva Capítulos e Cenas', async () => { const f = fx();
     const r = await longPress(bkHead(f.B2.id)); ok(drag && drag.keys.size === 4, 'o Tomo deve transportar Capítulos e Cenas');
     const cx = dropX('book', f.B2.id, null, 0); pe('pointermove', window, cx, r.top + 20); pe('pointerup', window, cx, r.top + 20); await W(30);
-    ok(topModal().textContent.includes('Mover o Tomo «Tomo 2»')); await answer(true);
+    ok(snackEl().textContent.includes('Tomo «Tomo 2» movido')); await answer(true);
     eq(state.books.map(b => b.name), ['Tomo 2', 'Tomo 1']); eq(narrOrder().map(i => state.scenes[i].title), ['b2', 'a4', 'a1', 'b1', 'a2', 'a3']);
     eq([...document.querySelectorAll('.book-kicker')].map(x => x.textContent), ['TOMO 1', 'TOMO 2']); });
   await T('C10 cancelar o arrasto de um Tomo repõe tudo', async () => { const f = fx(); await dragTo(bkHead(f.B2.id), dropX('book', f.B2.id, null, 0)); await answer(false); eq(state.books.map(b => b.name), ['Tomo 1', 'Tomo 2']); });
@@ -275,7 +279,7 @@ window.__qa = (async () => {
   await T('D06 ficha do Tomo: lista de Personagens, Mark as Main só neste Tomo, abre ficha', async () => { const f = fx(); const ana = newCharacter('Ana'); ana.gender = 'F'; ana.age = '30';
     f.a1.chars.push(ana.id); f.a4.chars.push(ana.id); f.b1.pov = ana.id; openBookFicha(f.B1.id); let rows = [...topModal().querySelectorAll('.list-row')];
     ok(rows[0].textContent.includes('Personagem Secundária') && rows[0].textContent.includes('Personagem POV') && rows[0].textContent.includes('F') && rows[0].textContent.includes('30 anos'));
-    btn('Marcar como principal').click(); eq(f.B1.mainChars, [ana.id]); eq(f.B2.mainChars, []); ok(topModal().querySelector('.list-row').textContent.includes('Personagem Principal'));
+    ok(tipFor(topModal().querySelector('.main-tog'))); topModal().querySelector('.main-tog').click(); eq(f.B1.mainChars, [ana.id]); eq(topModal().querySelector('.main-tog').getAttribute('aria-pressed'), 'true'); eq(f.B2.mainChars, []); ok(topModal().querySelector('.list-row').textContent.includes('Personagem Principal'));
     topModal().querySelector('.list-row .grow').click(); ok(topModal().textContent.includes('Ficha da Personagem')); eq(modals().length, 2); });
   await T('D07 ficha da Personagem: editar atributos reflete-se no Tomo', async () => { const f = fx(); const c = newCharacter('Rui'); f.a1.chars.push(c.id); openBookFicha(f.B1.id); openCharFicha(c.id); const m = topModal();
     setInput(m.querySelectorAll('input')[0], 'Rui Sá'); setSelect(m.querySelector('select'), 'M'); setInput(m.querySelectorAll('input')[1], '52'); eq([c.name, c.gender, c.age], ['Rui Sá', 'M', '52']);
@@ -294,8 +298,10 @@ window.__qa = (async () => {
       pe('pointerdown', card, r.left + 20, r.top + 20); await W(430); ok(card.classList.contains('drag'), 'cartão não ficou em arrasto');
       pe('pointermove', window, r.left + 20 + steps * 162, r.top + 20); const others = [...topModal().querySelectorAll('.arc-card')].filter(c => c !== card && c.style.transform);
       ok(others.length === Math.abs(steps), 'vizinhos deviam afastar-se'); pe('pointerup', window, r.left + 20 + steps * 162, r.top + 20); await W(30); await answer(yes); await W(20); };
-    await drg('a4', -3, false); eq([f.a1.chron, f.a2.chron, f.a3.chron, f.a4.chron], [1, 2, 3, 4], 'cancelar');
-    await drg('a4', -3, true); eq([f.a4.chron, f.a1.chron, f.a2.chron, f.a3.chron], [1, 2, 3, 4], 'confirmar');
+    const chron = t => Object.values(state.scenes).find(s => s.title === t).chron; // depois de «Anular», o estado é outro objeto
+    await drg('a4', -3, false); eq(['a1', 'a2', 'a3', 'a4'].map(chron), [1, 2, 3, 4], 'Anular, na barra, repõe');
+    closeAllModals(); openArcFicha(f.A.id); { const c2 = topModal().querySelector('.switch-wrap input'); c2.checked = true; c2.dispatchEvent(new Event('change')); }
+    await drg('a4', -3, true); eq(['a4', 'a1', 'a2', 'a3'].map(chron), [1, 2, 3, 4], 'mover fica feito sem perguntar');
     eq(narrOrder().map(i => state.scenes[i].title), ['a1', 'b1', 'a2', 'a3', 'b2', 'a4'], 'a Ordem Narrativa não muda'); });
   await T('D11 no modo Ordem Narrativa o arrasto na ficha não está ativo', async () => { const f = fx(); openArcFicha(f.A.id); const card = topModal().querySelector('.arc-card'); const r = card.getBoundingClientRect();
     pe('pointerdown', card, r.left + 20, r.top + 20); await W(430); ok(!card.classList.contains('drag')); pe('pointerup', window, 0, 0); });
@@ -311,11 +317,11 @@ window.__qa = (async () => {
 
   /* ================= E. SEPARADORES ================= */
   await T('E01 Tomos: lista, filtros por Personagem e por Arco Narrativo, abrir ficha', async () => { const f = fx(); const c = newCharacter('Lia'); f.a4.chars.push(c.id); const solo = newArc('só no 2'); insertScene(f.c3.id, 0, solo.id);
-    setTab('books'); eq(document.querySelectorAll('#view-page .card').length, 2);
-    await pickAC(document.querySelectorAll('#view-page .page-head input')[0], 'Li', 'Lia'); eq(filters.booksChar, c.id); eq([...document.querySelectorAll('#view-page .card h3')].map(x => x.textContent), ['Tomo 2']);
-    document.querySelector('#view-page .chip-x').click(); eq(document.querySelectorAll('#view-page .card').length, 2);
-    await pickAC(document.querySelectorAll('#view-page .page-head input')[1], 'só', 'só no 2'); eq([...document.querySelectorAll('#view-page .card h3')].map(x => x.textContent), ['Tomo 2']);
-    document.querySelector('#view-page .card').click(); ok(topModal().textContent.includes('Ficha do Tomo')); });
+    setTab('books'); eq(document.querySelectorAll('#view-page .card:not(.ch-card)').length, 2);
+    await pickAC(document.querySelectorAll('#view-page .page-head input')[0], 'Li', 'Lia'); eq(filters.booksChar, c.id); eq([...document.querySelectorAll('#view-page .card:not(.ch-card) h3')].map(x => x.textContent), ['Tomo 2']);
+    document.querySelector('#view-page .chip-x').click(); eq(document.querySelectorAll('#view-page .card:not(.ch-card)').length, 2);
+    await pickAC(document.querySelectorAll('#view-page .page-head input')[1], 'só', 'só no 2'); eq([...document.querySelectorAll('#view-page .card:not(.ch-card) h3')].map(x => x.textContent), ['Tomo 2']);
+    document.querySelector('#view-page .card:not(.ch-card)').click(); ok(topModal().textContent.includes('Ficha do Tomo')); });
   await T('E02 Personagens: filtros por Tomo e Main/Side', async () => { const f = fx(); const a = newCharacter('Ana'), b = newCharacter('Beto'), c = newCharacter('Caio'); f.a1.chars.push(a.id); f.a4.chars.push(b.id); f.B2.mainChars.push(b.id);
     setTab('characters'); const names = () => [...document.querySelectorAll('#view-page .card h3')].map(x => x.textContent); eq(names(), ['Ana', 'Beto', 'Caio']);
     setSelect(document.querySelector('#view-page select'), f.B1.id); eq(names(), ['Ana']); setSelect(document.querySelector('#view-page select'), '');
@@ -325,8 +331,8 @@ window.__qa = (async () => {
     await pickAC(document.querySelector('#view-page .page-head input'), 'Lia', 'Lia'); eq([...document.querySelectorAll('#view-page .card h3')].map(x => x.textContent), ['B']);
     document.querySelector('#view-page .card').click(); ok(topModal().textContent.includes('Ficha do Arco Narrativo')); });
   await T('E04 Referências: Nota, Link, ficheiros (guardados localmente), filtro por tipo, eliminar', async () => { setTab('refs');
-    btn('Nova Nota', $('#view-page')).click(); await W(20); eq(state.refs[0].type, 'note'); closeAllModals();
-    btn('Nova Referência', $('#view-page')).click(); await W(20); let m = topModal(); ok(m.querySelector('.dropzone') && m.querySelector('input[type="file"]'));
+    ok(tipFor($('#view-page .ref-new')), 'um só «+ Novo»'); $('#view-page .ref-new').click(); await W(20); eq(menuLabels(), ['Nota', 'Ficheiro ou Link…']); ok([...document.querySelectorAll('.ctx-item')].every(x => tipFor(x))); await menuClick('Nota'); eq(state.refs[0].type, 'note'); closeAllModals();
+    $('#view-page .ref-new').click(); await W(20); await menuClick('Ficheiro ou Link'); let m = topModal(); ok(m.querySelector('.dropzone') && m.querySelector('input[type="file"]'));
     setInput(m.querySelector('input[placeholder^="https"]'), 'https://example.org/a'); btn('Adicionar Link', m).click(); await W(20); eq(state.refs[1].type, 'link');
     await addFilesAsRefs([new File(['olá'], 'texto.txt', {type:'text/plain'}), new File([new Uint8Array(2000)], 'som.mp3', {type:'audio/mpeg'}), new File([new Uint8Array(10)], 'filme.mp4', {type:'video/mp4'})], null);
     eq(state.refs.map(r => r.type), ['note', 'link', 'document', 'audio', 'video']); const blob = await idb.get(state.refs[2].id); eq(await blob.text(), 'olá');
@@ -355,14 +361,14 @@ window.__qa = (async () => {
     ok(document.querySelector('#view-page').textContent.includes('Figuras de som'));
     const inp = document.querySelector('.sup-search'); setInput(inp, 'metafora'); 
     const first = document.querySelector('#view-page .card h3'); eq(first.textContent, 'Metáfora'); ok(!document.querySelector('.sup-nav button.on'), 'com pesquisa, nenhuma secção fica ativa');
-    setInput(inp, 'flashback'); eq(document.querySelector('#view-page .card h3').textContent, 'Analepse');
+    setInput(inp, 'flashback'); eq(document.querySelector('#view-page .card h3').textContent, 'Analepse (Flashback)');
     setInput(inp, 'zzzqqq'); eq(document.querySelectorAll('#view-page .card').length, 0); ok(document.querySelector('#view-page').textContent.includes('Nada encontrado'));
     setInput(inp, 'camoes'); ok(document.querySelectorAll('#view-page .card').length >= 8, 'a pesquisa devia procurar também nos exemplos');
     navBtn('recursos').click(); eq(inp.value, ''); eq(filters.supQ, '');
     openSupportFicha('Analepse'); let m = topModal(); ok(m.textContent.includes('Na ferramenta') && m.textContent.includes('Ver também') && m.textContent.includes('Flashback'));
     const chip = [...m.querySelectorAll('.chip.click')].find(c => c.textContent === 'Prolepse'); chip.click(); await W(30);
-    eq(document.querySelectorAll('.modal').length, 1, 'a ficha anterior devia fechar'); ok(topModal().querySelector('h2').textContent === 'Prolepse'); topModal().querySelector('.modal-head .icon-btn').click(); await W(20);
-    openNarratorFicha('intruso'); eq(topModal().querySelector('h2').textContent, 'Narrador intruso (comentador)'); topModal().querySelector('.modal-head .icon-btn').click(); await W(20); });
+    eq(document.querySelectorAll('.modal').length, 1, 'a ficha anterior devia fechar'); ok(topModal().querySelector('h2').textContent === 'Prolepse (Flash-forward)'); topModal().querySelector('.modal-head .modal-x').click(); await W(20);
+    openNarratorFicha('intruso'); eq(topModal().querySelector('h2').textContent, 'Narrador intruso (comentador)'); topModal().querySelector('.modal-head .modal-x').click(); await W(20); });
   await T('E08 Definições: nome do projeto e paletas', async () => { setTab('settings'); setInput(document.querySelector('#view-page input'), 'O Meu Romance'); eq(state.project.name, 'O Meu Romance'); eq($('#projName').textContent, 'O Meu Romance');
     const n0 = document.querySelectorAll('.pal').length; ok(n0 >= 8); document.querySelectorAll('.pal')[1].click(); eq(state.project.palette.mode, 'light'); eq(document.documentElement.style.getPropertyValue('--surface'), '#ffffff');
     ok(document.querySelectorAll('.pal')[1].classList.contains('on')); btn('Gerar novas paletas', $('#view-page')).click(); eq(document.querySelectorAll('.pal').length, n0 + 6);
@@ -385,7 +391,7 @@ window.__qa = (async () => {
     clickBack(); eq(modals().length, 1, 'o 2.º clique de um duplo clique não deve fechar a ficha acabada de abrir'); await W(380); clickBack(); eq(modals().length, 0); });
 
   await T('E13 filtros que apontam para algo eliminado são limpos', async () => { const f = fx(); const c = newCharacter('Lia'); f.a1.chars.push(c.id); filters.booksChar = c.id; filters.arcsChar = c.id; filters.charsBook = f.B2.id;
-    deleteCharacter(c.id); deleteBook(f.B2.id); newCharacter('Outro'); setTab('books'); eq(document.querySelectorAll('#view-page .card').length, 1); setTab('arcs'); eq(document.querySelectorAll('#view-page .card').length, 2);
+    deleteCharacter(c.id); deleteBook(f.B2.id); newCharacter('Outro'); setTab('books'); eq(document.querySelectorAll('#view-page .card:not(.ch-card)').length, 1); setTab('arcs'); eq(document.querySelectorAll('#view-page .card').length, 2);
     setTab('characters'); eq(document.querySelectorAll('#view-page .card').length, 1); });
 
   /* ================= F. VISITA GUIADA ================= */
@@ -400,8 +406,8 @@ window.__qa = (async () => {
     document.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowRight'})); eq(Tour.i, 2); document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'})); ok(!Tour.active && state === real);
     startTour(); Tour.i = Tour.steps.findIndex(s => s.title === 'Ficha da Cena'); showTourStep(); await W(30); eq(modals().length, 1); btn('Terminar visita', $('#tourPop')).click(); ok(!Tour.active && state === real); eq(modals().length, 0); });
   await T('F03 visita: a simulação de arrasto mexe só na pré-visualização e reverte', async () => { startTour(); Tour.i = Tour.steps.findIndex(s => s.title === 'Mover Cenas'); showTourStep(); const demo = JSON.stringify(state);
-    await W(1100); ok(L.order.indexOf('s3') === 3,'pré-visualização da Cena movida: ' + L.order.join()); eq(JSON.stringify(state), demo, 'dados intactos durante a simulação');
-    await W(2700); ok(L.order.indexOf('s3') === 2, 'revertida'); endTour(); });
+    await W(1100); ok(L.order.indexOf('s3') === 4,'pré-visualização da Cena movida: ' + L.order.join()); eq(JSON.stringify(state), demo, 'dados intactos durante a simulação');
+    await W(2700); ok(L.order.indexOf('s3') === 3, 'revertida'); endTour(); });
   await T('F04 visita: simulação de convergência não cria ligação', async () => { startTour(); Tour.i = Tour.steps.findIndex(s => s.title === 'Convergências'); showTourStep(); await W(1500); ok(linkDrag && linkDrag.fake); await W(2400); ok(!linkDrag); eq(state.scenes.s7.convergeTo, null); endTour(); });
   await T('F05 visita: cliques no quadro são ignorados durante a visita', async () => { startTour(); const el = sceneEl('s1'); el.click(); eq(modals().length, 0); await longPress(el); ok(!drag); pe('pointerup', window, 0, 0); endTour(); });
 
@@ -451,7 +457,7 @@ window.__qa = (async () => {
   /* ================= I. EXPLICADORES E LOGOTIPO ================= */
   const hover = el => el.dispatchEvent(new MouseEvent('mouseover', {bubbles:true, clientX:200, clientY:200}));
   const tipOn = () => { const t = $('#tip'); return t && t.classList.contains('on') ? t.textContent : null; };
-  await T('I01 explicador aparece ao parar sobre uma Cena e desaparece ao clicar', async () => { const f = fx(); await W(80); hover(sceneEl(f.a1.id)); ok(!tipOn(), 'apareceu sem atraso'); await W(Tips.DELAY + 80); ok(/Cena/.test(tipOn()), 'sem explicador'); pe('pointerdown', document.body, 5, 5); pe('pointerup', window, 5, 5); ok(!tipOn()); });
+  await T('I01 explicador aparece ao parar sobre uma Cena e desaparece ao clicar', async () => { const f = fx(); await W(80); hover(sceneEl(f.a1.id)); ok(!tipOn(), 'apareceu sem atraso'); await W(Tips.DELAY + 80); ok(/a1/.test(tipOn()) && /abrir a ficha/.test(tipOn()) && /Por escrever/.test(tipOn()), 'o explicador mostra o título, o estado e como abrir: ' + tipOn()); pe('pointerdown', document.body, 5, 5); pe('pointerup', window, 5, 5); ok(!tipOn()); });
   await T('I02 explicadores desligados nas Definições não aparecem', async () => { const f = fx(); setTab('settings'); const chk = [...document.querySelectorAll('#view-page .switch-wrap')].find(x => x.textContent.includes('Mostrar explicadores')).querySelector('input'); ok(chk.checked); chk.click(); ok(!Tips.on); setTab('board'); hover(sceneEl(f.a1.id)); await W(Tips.DELAY + 80); ok(!tipOn()); setTipsOn(true); });
   await T('I03 sem explicadores durante a visita nem durante um arrasto', async () => { const f = fx(); startTour(); hover(sceneEl('s1')); await W(Tips.DELAY + 80); ok(!tipOn()); endTour(); await longPress(sceneEl(f.a1.id)); ok(drag); hover(sceneEl(f.a2.id)); await W(Tips.DELAY + 80); ok(!tipOn()); key('Escape'); pe('pointerup', window, 0, 0); });
   await T('I04 todos os controlos têm explicador (quadro, separadores, fichas, menus)', async () => { const f = fx(); const c = newCharacter('X'); f.a1.chars.push(c.id); f.a1.pov = c.id; f.B1.mainChars.push(c.id); f.b2.convergeTo = f.a3.id; newArc('br', f.A.id, f.a2.id);
@@ -460,7 +466,7 @@ window.__qa = (async () => {
     const scan = where => document.querySelectorAll('#topbar button, #rail button, #board button, #board .scene, #board .ch-head, #board .book-head, #board .lane-label, #view-page button, #view-page .card:not(.static), #view-page .page-head input, #view-page .page-head select, .modal button, .modal a.btn, .modal .chip, .modal .arc-card, .modal .switch-wrap, .modal .dropzone, .modal .sec-title, .modal .field > label, .ctx-item')
       .forEach(el => { if (!tipFor(el) && !skip.test(el.textContent.trim())) miss.push(where + ': ' + (el.textContent.trim().slice(0, 30) || el.className)); });
     scan('quadro'); for (const t of ['books', 'arcs', 'characters', 'sceneries', 'refs', 'plan', 'support', 'settings']){ setTab(t); scan(t); } setTab('board'); settle();
-    for (const open of [() => openSceneFicha(f.b2.id), () => openSceneFicha(f.a1.id), () => openBookFicha(f.B1.id), () => openCharFicha(c.id), () => openArcFicha(f.A.id), () => openRefFicha('rl'), () => newRefDialog(null), () => openSceneryFicha(scn.id), () => { openSceneryFicha(scn.id); btn('Associar Personagem').click(); }, () => { openCharFicha(c.id); btn('Associar Cenário').click(); }]){ open(); scan('ficha ' + topModal().querySelector('.modal-title').textContent); closeAllModals(); }
+    for (const open of [() => openSceneFicha(f.b2.id), () => openSceneFicha(f.a1.id), () => openBookFicha(f.B1.id), () => openCharFicha(c.id), () => openArcFicha(f.A.id), () => openRefFicha('rl'), () => newRefDialog(null), () => openSceneryFicha(scn.id), () => { openSceneryFicha(scn.id); btn('Associar Personagem').click(); }, () => { openCharFicha(c.id); btn('Associar Localização').click(); }]){ open(); scan('ficha ' + topModal().querySelector('.modal-title').textContent); closeAllModals(); }
     for (const el of [sceneEl(f.a1.id), chHead(f.c1.id), bkHead(f.B1.id)]){ const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', {bubbles:true, cancelable:true, clientX:r.left + 5, clientY:r.top + 5})); scan('menu'); closeMenu(); }
     $('#createBtn').click(); scan('Criar'); closeMenu(); $('#tourBtn').click(); scan('ajuda'); closeMenu();
     eq(miss, []); });
@@ -482,7 +488,7 @@ window.__qa = (async () => {
   await T('K05 Personagem percorre Cena → Tomo → separadores → eliminar', async () => { const f = fx(); openSceneFicha(f.a1.id); const inp = topModal().querySelector('input[placeholder^="Adicionar Personagem"]'); setInput(inp, 'Inês'); inp.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true})); await W(30);
     const c = state.characters[0]; eq(c.name, 'Inês'); ok(f.a1.chars.includes(c.id)); f.a1.pov = c.id; commit(); closeAllModals();
     eq(bookCharacters(f.B1).map(v => v.ch.name + (v.pov ? ' POV' : '')), ['Inês POV']); eq(bookCharacters(f.B2).length, 0); eq(arcCharIds(f.A.id), [c.id]); ok(sceneEl(f.a1.id).textContent.includes('POV Inês'));
-    filters.booksChar = c.id; setTab('books'); eq(document.querySelectorAll('#view-page .card').length, 1); filters.arcsChar = c.id; setTab('arcs'); eq(document.querySelectorAll('#view-page .card').length, 1);
+    filters.booksChar = c.id; setTab('books'); eq(document.querySelectorAll('#view-page .card:not(.ch-card)').length, 1); filters.arcsChar = c.id; setTab('arcs'); eq(document.querySelectorAll('#view-page .card').length, 1);
     deleteCharacter(c.id); commit(); eq([f.a1.chars.length, f.a1.pov, filters.arcsChar], [0, null, null]); setTab('board'); ok(!sceneEl(f.a1.id).textContent.includes('POV')); });
   await T('K06 Referência percorre ficha → separador → entidade eliminada', async () => { const f = fx(); openSceneFicha(f.a1.id); btn('+ Criar Nota').click(); await W(20); const r = state.refs[0]; eq(r.links, [{kind:'scene', id:f.a1.id}]); closeAllModals();
     r.links.push({kind:'book', id:f.B2.id}, {kind:'arc', id:f.A.id}); commit(); setTab('refs'); ok(document.querySelector('#view-page .card').textContent.includes('3 associações'));
@@ -531,84 +537,84 @@ window.__qa = (async () => {
     ok(card().querySelector('[data-install="manual"]'), 'sem instruções'); let asked = 0; const ev = new Event('beforeinstallprompt', {cancelable:true}); ev.prompt = () => asked++; ev.userChoice = Promise.resolve({outcome:'accepted'}); window.dispatchEvent(ev);
     ok(ev.defaultPrevented); const b = btn('Instalar', card()); ok(b, 'sem botão Instalar'); ok(tipFor(b)); b.click(); await W(20); eq(asked, 1); window.dispatchEvent(new Event('appinstalled')); ok(card().querySelector('[data-install="installed"]')); Install.done = false; Install.prompt = null; });
 
-  /* ---- L: Cenários ---- */
+  /* ---- L: Localizações ---- */
   const cardNames = () => [...document.querySelectorAll('#view-page .card h3')].map(x => x.textContent);
   const chipNames = (root, i) => [...root.querySelectorAll('.chip.click')].map(x => x.firstChild.textContent);
-  await T('L01 ordem das áreas', () => { eq(TABS.map(t => t[1]), ['Narrativa', 'Calendarização e Objetivos', 'Tomos', 'Arcos Narrativos', 'Personagens', 'Cenários', 'Referências', 'Materiais de Apoio', 'Definições do Projeto']);
+  await T('L01 ordem das áreas', () => { eq(TABS.map(t => t[1]), ['Narrativa', 'Calendarização e Objetivos', 'Tomos e Capítulos', 'Arcos Narrativos', 'Personagens', 'Localizações', 'Referências', 'Materiais de Apoio', 'Definições do Projeto']);
     eq([...document.querySelectorAll('#rail .nav-item')].map(t => t.dataset.tab), ['board', 'plan', 'books', 'arcs', 'characters', 'sceneries', 'refs', 'support']); });
-  await T('L02 separador Cenários: vazio, criar com «+», ficha com nome editável', async () => { setTab('sceneries'); ok($('#view-page').textContent.includes('Ainda não existem Cenários'));
-    btn('+ Novo Cenário', $('#view-page')).click(); await W(20); eq(state.sceneries.length, 1); const x = state.sceneries[0]; let m = topModal(); ok(m.textContent.includes('Ficha do Cenário'));
+  await T('L02 separador Localizações: vazio, criar com «+», ficha com nome editável', async () => { setTab('sceneries'); ok($('#view-page').textContent.includes('Ainda não existem Localizações'));
+    btn('+ Nova Localização', $('#view-page')).click(); await W(20); eq(state.sceneries.length, 1); const x = state.sceneries[0]; let m = topModal(); ok(m.textContent.includes('Ficha da Localização'));
     const inp = m.querySelector('input'); setInput(inp, 'Praia'); eq(x.name, 'Praia'); eq(cardNames(), ['Praia']);
-    setInput(inp, ''); inp.dispatchEvent(new Event('change')); eq(x.name, 'Cenário', 'o nome não pode ficar vazio'); });
-  await T('L03 Cena ↔ Cenário: associar existente, criar novo, desassociar, vários para vários', async () => { const f = fx(); const p = newScenery('Praia');
-    openSceneFicha(f.a1.id); btn('+ Associar Cenário').click(); await W(20); await pickAC(topModal().querySelector('input'), 'Pra', 'Praia'); eq(f.a1.sceneries, [p.id]);
+    setInput(inp, ''); inp.dispatchEvent(new Event('change')); eq(x.name, 'Localização', 'o nome não pode ficar vazio'); });
+  await T('L03 Cena ↔ Localização: associar existente, criar novo, desassociar, vários para vários', async () => { const f = fx(); const p = newScenery('Praia');
+    openSceneFicha(f.a1.id); btn('+ Associar Localização').click(); await W(20); await pickAC(topModal().querySelector('input'), 'Pra', 'Praia'); eq(f.a1.sceneries, [p.id]);
     eq(document.querySelectorAll('.modal').length, 1, 'a janela de associação devia fechar'); ok(topModal().textContent.includes('Praia'));
-    btn('+ Associar Cenário').click(); await W(20); const inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'Cais'); await W(10);
-    ok(![...document.querySelectorAll('.ac-item')].some(i => i.textContent === 'Praia'), 'um Cenário já associado não devia ser sugerido');
+    btn('+ Associar Localização').click(); await W(20); const inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'Cais'); await W(10);
+    ok(![...document.querySelectorAll('.ac-item')].some(i => i.textContent === 'Praia'), 'uma Localização já associado não devia ser sugerido');
     document.querySelector('.ac-item.create').dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true})); await W(20);
     eq(state.sceneries.map(x => x.name), ['Praia', 'Cais']); const c = state.sceneries[1]; eq(f.a1.sceneries, [p.id, c.id]);
     f.a2.sceneries.push(p.id); f.b2.sceneries.push(p.id); eq(sceneryScenes(p.id).map(s => s.title), ['a1', 'a2', 'b2'], 'Cenas pela Ordem Narrativa');
     [...topModal().querySelectorAll('.chip.click')].find(ch => ch.textContent.includes('Praia')).querySelector('.chip-x').click(); eq(f.a1.sceneries, [c.id]); ok(sceneryById(p.id), 'desassociar não elimina'); });
-  await T('L04 ficha do Cenário: Cenas, Personagens, Notas e Referências', async () => { const f = fx(); const p = newScenery('Praia'); const ana = newCharacter('Ana'); f.a2.sceneries.push(p.id); f.b2.sceneries.push(p.id);
+  await T('L04 ficha da Localização: Cenas, Personagens, Notas e Referências', async () => { const f = fx(); const p = newScenery('Praia'); const ana = newCharacter('Ana'); f.a2.sceneries.push(p.id); f.b2.sceneries.push(p.id);
     state.refs.push({id:'rl', type:'link', title:'Mapa', url:'https://x', links:[], created:1}); openSceneryFicha(p.id); let m = topModal();
     eq([...m.querySelectorAll('.list-row .grow')].map(x => x.firstChild.textContent), ['a2', 'b2']);
     btn('+ Associar Personagem').click(); await W(20); await pickAC(topModal().querySelector('input'), 'An', 'Ana'); eq(p.chars, [ana.id]);
     btn('+ Associar Personagem').click(); await W(20); const inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'Beto'); await W(10);
     document.querySelector('.ac-item.create').dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true})); await W(20); eq(state.characters.map(c => c.name), ['Ana', 'Beto']); eq(p.chars.length, 2);
     btn('+ Associar Cena').click(); await W(20); await pickAC(topModal().querySelector('input'), 'a4', 'a4'); eq(f.a4.sceneries, [p.id]);
-    btn('+ Criar Nota').click(); await W(20); const n = state.refs.find(r => r.type === 'note'); eq(n.links, [{kind:'scenery', id:p.id}]); topModal().querySelector('.modal-head .icon-btn').click(); await W(20);
+    btn('+ Criar Nota').click(); await W(20); const n = state.refs.find(r => r.type === 'note'); eq(n.links, [{kind:'scenery', id:p.id}]); topModal().querySelector('.modal-head .modal-x').click(); await W(20);
     btn('+ Associar Referência').click(); await W(20); await pickAC(topModal().querySelector('input'), 'Map', 'Mapa'); eq(refById('rl').links, [{kind:'scenery', id:p.id}]);
     m = topModal(); ok(m.textContent.includes('Mapa') && m.textContent.includes('Nova Nota'));
     m.querySelector('.list-row .grow').click(); await W(20); ok(topModal().textContent.includes('Ficha da Cena'), 'clicar numa Cena abre a sua ficha'); ok(topModal().textContent.includes('Praia')); });
-  await T('L05 Personagem ↔ Cenário nos dois sentidos e filtro do separador', async () => { fx(); const ana = newCharacter('Ana'), beto = newCharacter('Beto'); const p = newScenery('Praia'), c = newScenery('Cais'); c.chars.push(beto.id);
-    openCharFicha(ana.id); btn('+ Associar Cenário').click(); await W(20); await pickAC(topModal().querySelector('input'), 'Pra', 'Praia'); eq(p.chars, [ana.id]); ok(topModal().textContent.includes('Praia'));
-    btn('+ Associar Cenário').click(); await W(20); const inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'Gruta'); await W(10);
+  await T('L05 Personagem ↔ Localização nos dois sentidos e filtro do separador', async () => { fx(); const ana = newCharacter('Ana'), beto = newCharacter('Beto'); const p = newScenery('Praia'), c = newScenery('Cais'); c.chars.push(beto.id);
+    openCharFicha(ana.id); btn('+ Associar Localização').click(); await W(20); await pickAC(topModal().querySelector('input'), 'Pra', 'Praia'); eq(p.chars, [ana.id]); ok(topModal().textContent.includes('Praia'));
+    btn('+ Associar Localização').click(); await W(20); const inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'Gruta'); await W(10);
     document.querySelector('.ac-item.create').dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true})); await W(20); const g = state.sceneries[2]; eq([g.name, g.chars], ['Gruta', [ana.id]]);
     eq(charSceneries(ana.id).map(x => x.name), ['Praia', 'Gruta']); closeAllModals();
     openSceneryFicha(p.id); ok(topModal().textContent.includes('Ana')); closeAllModals();
     setTab('sceneries'); eq(cardNames(), ['Cais', 'Gruta', 'Praia']); await pickAC(document.querySelector('#view-page .page-head input'), 'An', 'Ana'); eq(filters.scnChar, ana.id); eq(cardNames(), ['Gruta', 'Praia']);
     document.querySelector('#view-page .page-head .chip-x').click(); eq(cardNames(), ['Cais', 'Gruta', 'Praia']);
     filters.scnChar = beto.id; renderAll(); eq(cardNames(), ['Cais']); deleteCharacter(beto.id); commit(); eq(filters.scnChar, null, 'o filtro cai com a Personagem'); eq(c.chars, []); });
-  await T('L06 eliminar: Cenário, Cena e Personagem não deixam ligações penduradas', async () => { const f = fx(); const ana = newCharacter('Ana'); const p = newScenery('Praia'); p.chars.push(ana.id); f.a1.sceneries.push(p.id); f.a2.sceneries.push(p.id);
+  await T('L06 eliminar: Localização, Cena e Personagem não deixam ligações penduradas', async () => { const f = fx(); const ana = newCharacter('Ana'); const p = newScenery('Praia'); p.chars.push(ana.id); f.a1.sceneries.push(p.id); f.a2.sceneries.push(p.id);
     state.refs.push({id:'rn', type:'note', title:'n', text:'', links:[{kind:'scenery', id:p.id}, {kind:'scene', id:f.a1.id}], created:1}); commit();
     deleteScene(f.a1.id); commit(); eq(sceneryScenes(p.id).map(s => s.title), ['a2']);
-    openSceneryFicha(p.id); btn('Eliminar Cenário').click(); await W(20); ok(topModal().textContent.includes('Praia')); await answer(false); ok(sceneryById(p.id)); btn('Eliminar Cenário').click(); await W(20); await answer(true);
+    openSceneryFicha(p.id); btn('Eliminar Localização').click(); await W(20); ok(topModal().textContent.includes('Praia')); await answer(false); ok(sceneryById(p.id)); btn('Eliminar Localização').click(); await W(20); await answer(true);
     eq(state.sceneries, []); eq(f.a2.sceneries, []); eq(refById('rn').links, []); eq(document.querySelectorAll('.modal').length, 0);
     undo(); eq(state.sceneries.map(x => x.name), ['Praia']); eq(state.scenes[f.a2.id].sceneries, [state.sceneries[0].id]); eq(refById('rn').links.length, 1); redo(); eq(state.sceneries, []); });
-  await T('L07 Referência ↔ Cenário a partir da ficha da Referência', async () => { fx(); const p = newScenery('Praia'); const r = newNote(); commit(); openRefFicha(r.id);
-    await pickAC(topModal().querySelector('input[placeholder^="Associar"]'), 'Pra', 'Cenário: Praia'); eq(r.links, [{kind:'scenery', id:p.id}]);
-    [...topModal().querySelectorAll('.chip.click span')].find(x => x.textContent === 'Cenário: Praia').click(); await W(20); ok(topModal().textContent.includes('Ficha do Cenário')); });
-  await T('L08 persistência e projetos antigos: sem Cenários, com lixo, e ida e volta', async () => { const f = fx(); const ana = newCharacter('Ana'); const p = newScenery('Praia'); p.chars.push(ana.id); f.a1.sceneries.push(p.id); commit(); flushSave();
+  await T('L07 Referência ↔ Localização a partir da ficha da Referência', async () => { fx(); const p = newScenery('Praia'); const r = newNote(); commit(); openRefFicha(r.id);
+    await pickAC(topModal().querySelector('input[placeholder^="Associar"]'), 'Pra', 'Localização: Praia'); eq(r.links, [{kind:'scenery', id:p.id}]);
+    [...topModal().querySelectorAll('.chip.click span')].find(x => x.textContent === 'Localização: Praia').click(); await W(20); ok(topModal().textContent.includes('Ficha da Localização')); });
+  await T('L08 persistência e projetos antigos: sem Localizações, com lixo, e ida e volta', async () => { const f = fx(); const ana = newCharacter('Ana'); const p = newScenery('Praia'); p.chars.push(ana.id); f.a1.sceneries.push(p.id); commit(); flushSave();
     const back = sanitize(JSON.parse(localStorage.getItem(LS_KEY))); eq(back.sceneries, [{id:p.id, name:'Praia', chars:[ana.id]}]); eq(back.scenes[f.a1.id].sceneries, [p.id]);
     const old = JSON.parse(JSON.stringify(state)); delete old.sceneries; Object.values(old.scenes).forEach(s => delete s.sceneries); old.refs.push({id:'r9', type:'note', title:'x', links:[{kind:'scenery', id:p.id}]});
-    const d = sanitize(old); eq(d.sceneries, []); ok(Object.values(d.scenes).every(s => Array.isArray(s.sceneries) && !s.sceneries.length)); eq(d.refs.find(r => r.id === 'r9').links, [], 'ligação a Cenário inexistente removida');
+    const d = sanitize(old); eq(d.sceneries, []); ok(Object.values(d.scenes).every(s => Array.isArray(s.sceneries) && !s.sceneries.length)); eq(d.refs.find(r => r.id === 'r9').links, [], 'ligação a Localização inexistente removida');
     const bad = JSON.parse(JSON.stringify(state)); bad.sceneries = [null, 5, {id:7, chars:[ana.id, ana.id, 'fantasma']}, {id:'q', name:'', chars:'x'}]; bad.scenes[f.a1.id].sceneries = ['7', '7', 'nada', 7];
-    const e = sanitize(bad); eq(e.sceneries, [{id:'7', chars:[ana.id], name:'Cenário'}, {id:'q', name:'Cenário', chars:[]}]); eq(e.scenes[f.a1.id].sceneries, ['7']);
-    state = d; renderAll(); setTab('sceneries'); ok($('#view-page').textContent.includes('Ainda não existem Cenários')); openSceneFicha(f.a1.id); ok(topModal().textContent.includes('Sem Cenários')); });
-  await T('L09 visita guiada: demonstração com Cenários e passo próprio', async () => { startTour(); eq(state.sceneries.length, 3); ok(Object.values(state.scenes).every(s => Array.isArray(s.sceneries)));
-    eq(sceneryScenes('sc1').map(s => s.id), ['s2', 's6']); ok(TOUR_STEPS.some(st => st.tab === 'sceneries')); const tabs = TOUR_STEPS.filter(st => st.tab).map(st => st.tab);
+    const e = sanitize(bad); eq(e.sceneries, [{id:'7', chars:[ana.id], name:'Localização'}, {id:'q', name:'Localização', chars:[]}]); eq(e.scenes[f.a1.id].sceneries, ['7']);
+    state = d; renderAll(); setTab('sceneries'); ok($('#view-page').textContent.includes('Ainda não existem Localizações')); openSceneFicha(f.a1.id); ok(topModal().textContent.includes('Sem Localizações')); });
+  await T('L09 visita guiada: demonstração com Localizações e passo próprio', async () => { startTour(); eq(state.sceneries.length, 15); ok(Object.values(state.scenes).every(s => Array.isArray(s.sceneries)));
+    eq(sceneryScenes('sc1').map(s => s.id).slice(0, 3), ['s2', 's11', 's4']); ok(TOUR_STEPS.some(st => st.tab === 'sceneries')); const tabs = TOUR_STEPS.filter(st => st.tab).map(st => st.tab);
     eq(tabs.filter((t, i) => t !== tabs[i - 1]), ['plan', 'books', 'arcs', 'characters', 'sceneries', 'refs', 'support', 'settings'], 'a visita segue a ordem dos separadores'); endTour(); eq(state.sceneries, []); });
 
   await T('L10 associar: não oferece criar um duplicado do que já está associado; mensagens da lista', async () => { const f = fx(); const p = newScenery('Praia'); f.a1.sceneries.push(p.id); const ana = newCharacter('Ana'); f.a1.chars.push(ana.id); renderAll();
-    openSceneFicha(f.a1.id); btn('+ Associar Cenário').click(); await W(20); let inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'praia'); await W(10);
+    openSceneFicha(f.a1.id); btn('+ Associar Localização').click(); await W(20); let inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'praia'); await W(10);
     ok(!document.querySelector('.ac-item.create'), 'não devia oferecer criar «praia»'); eq(document.querySelector('.ac-empty').textContent, 'Já está associado');
     inp.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true})); await W(20); eq(state.sceneries.length, 1);
     setInput(inp, 'Gruta'); await W(10); ok(document.querySelector('.ac-item.create'), 'um nome novo pode ser criado'); closeAllModals(); await W(160);
     openSceneFicha(f.a1.id); inp = topModal().querySelector('input[placeholder^="Adicionar Personagem"]'); inp.focus(); setInput(inp, 'ANA'); await W(10); ok(!document.querySelector('.ac-item.create')); eq(state.characters.length, 1); closeAllModals();
     newScenery('Cais'); openSceneryFicha(p.id); btn('+ Associar Cena').click(); await W(20); inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'zzz'); await W(10); eq(document.querySelector('.ac-empty').textContent, 'Sem resultados');
     setInput(inp, ''); await W(10); ok(document.querySelectorAll('.ac-item').length === 5, 'as 5 Cenas por associar'); });
-  await T('L11 Enter repetido (tecla premida) não escolhe o primeiro item', async () => { const f = fx(); const p = newScenery('Praia'); openSceneFicha(f.a1.id); btn('+ Associar Cenário').click(); await W(20);
+  await T('L11 Enter repetido (tecla premida) não escolhe o primeiro item', async () => { const f = fx(); const p = newScenery('Praia'); openSceneFicha(f.a1.id); btn('+ Associar Localização').click(); await W(20);
     const inp = topModal().querySelector('input'); inp.focus(); inp.dispatchEvent(new Event('focus')); await W(10); inp.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true, repeat:true})); await W(20); eq(f.a1.sceneries, []);
     inp.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true})); await W(20); eq(f.a1.sceneries, [p.id]); });
-  await T('L12 Cenários derivados das Cenas: fichas do Tomo, do Arco Narrativo, da Personagem e do Cenário', async () => { const f = fx(); const p = newScenery('Praia'), g = newScenery('Gruta'); const ana = newCharacter('Ana'), beto = newCharacter('Beto');
+  await T('L12 Localizações derivados das Cenas: fichas do Tomo, do Arco Narrativo, da Personagem e da Localização', async () => { const f = fx(); const p = newScenery('Praia'), g = newScenery('Gruta'); const ana = newCharacter('Ana'), beto = newCharacter('Beto');
     f.a1.sceneries.push(p.id); f.b2.sceneries.push(g.id); f.a1.chars.push(ana.id); f.a1.pov = beto.id; p.chars.push(ana.id); renderAll();
     const secChips = t => { const sec = [...topModal().querySelectorAll('.sec')].find(x => x.querySelector('.sec-title').textContent === t); return [...sec.querySelectorAll('.chip.click')].map(c => c.textContent.replace('✕', '')); };
-    openBookFicha(f.B1.id); eq(secChips('Cenários'), ['Praia']); closeAllModals(); openBookFicha(f.B2.id); eq(secChips('Cenários'), ['Gruta']); closeAllModals();
-    openArcFicha(f.A.id); eq(secChips('Cenários'), ['Praia']); closeAllModals(); openArcFicha(f.Bq.id); eq(secChips('Cenários'), ['Gruta']); closeAllModals();
-    openSceneryFicha(p.id); eq(secChips('Personagens associadas'), ['Ana', 'Beto'], 'Ana associada + Beto das Cenas'); ok(topModal().textContent.includes('Figuram nas Cenas deste Cenário')); closeAllModals();
-    openCharFicha(beto.id); eq(secChips('Cenários'), ['Praia']); ok(topModal().textContent.includes('Das Cenas em que figura')); closeAllModals();
-    openCharFicha(ana.id); eq(secChips('Cenários'), ['Praia']); ok(!topModal().textContent.includes('Das Cenas em que figura'), 'já associado diretamente: não se repete'); });
-  await T('L13 ficha nova: o nome fica focado e selecionado', async () => { setTab('sceneries'); btn('+ Novo Cenário', $('#view-page')).click(); await W(80); let i = topModal().querySelector('input'); ok(document.activeElement === i); eq([i.selectionStart, i.selectionEnd], [0, i.value.length]); closeAllModals();
+    openBookFicha(f.B1.id); eq(secChips('Localizações'), ['Praia']); closeAllModals(); openBookFicha(f.B2.id); eq(secChips('Localizações'), ['Gruta']); closeAllModals();
+    openArcFicha(f.A.id); eq(secChips('Localizações'), ['Praia']); closeAllModals(); openArcFicha(f.Bq.id); eq(secChips('Localizações'), ['Gruta']); closeAllModals();
+    openSceneryFicha(p.id); eq(secChips('Personagens associadas'), ['Ana', 'Beto'], 'Ana associada + Beto das Cenas'); ok(topModal().textContent.includes('Figuram nas Cenas desta Localização')); closeAllModals();
+    openCharFicha(beto.id); eq(secChips('Localizações'), ['Praia']); ok(topModal().textContent.includes('Das Cenas em que figura')); closeAllModals();
+    openCharFicha(ana.id); eq(secChips('Localizações'), ['Praia']); ok(!topModal().textContent.includes('Das Cenas em que figura'), 'já associado diretamente: não se repete'); });
+  await T('L13 ficha nova: o nome fica focado e selecionado', async () => { setTab('sceneries'); btn('+ Nova Localização', $('#view-page')).click(); await W(80); let i = topModal().querySelector('input'); ok(document.activeElement === i); eq([i.selectionStart, i.selectionEnd], [0, i.value.length]); closeAllModals();
     setTab('characters'); btn('+ Nova Personagem', $('#view-page')).click(); await W(80); i = topModal().querySelector('input'); ok(document.activeElement === i); eq(i.selectionEnd, i.value.length); });
   await T('L14 importar ficheiro com lixo: normaliza sem rebentar; ficheiro inválido não apaga as Referências guardadas', async () => { const f = fx(); await idb.put('guardado', new Blob(['x']));
     const d = sanitize({books:[null, {id:1, chapters:[null, {id:2, scenes:['s']}]}], scenes:{s:{arcId:'a'}, t:null}, arcs:[null, 7, {id:'a'}], characters:[null, 'x'], refs:[null, {id:'r', links:[null, 5]}], sceneries:'x', project:'p'});
@@ -685,7 +691,7 @@ window.__qa = (async () => {
     window.dispatchEvent(ev); ok(!$('#installBtn').hidden, 'o botão aparece quando o browser permite instalar'); $('#installBtn').click(); await W(20); eq(asked, 1);
     installHelp(); ok(topModal().textContent.includes('Adicionar ao ecrã principal')); closeAllModals(); Install.prompt = null; syncInstallBtn(); });
   await T('M11 a visita guiada cobre as novidades e todos os passos têm alvo', async () => { const titles = TOUR_STEPS.map(x => x.title);
-    for (const t of ['Anular, refazer e gravação automática', 'Explicadores', 'Dois ecrãs', 'Telemóvel e tablet', 'Separador Cenários']) ok(titles.includes(t), 'falta o passo ' + t);
+    for (const t of ['Anular, refazer e gravação automática', 'Explicadores', 'Dois ecrãs', 'Telemóvel e tablet', 'Separador Localizações']) ok(titles.includes(t), 'falta o passo ' + t);
     startTour(); Tour.i = Tour.steps.findIndex(x => x.title === 'Explicadores'); showTourStep(); await W(60); ok($('#tip').classList.contains('on'), 'o passo mostra um explicador'); ok(parseFloat($('#tourSpot').style.width) > 20);
     Tour.i++; showTourStep(); await W(40); ok(!$('#tip').classList.contains('on')); endTour(); });
   /* Os textos nunca saem da sua caixa: corre a ferramenta em janelas de vários tamanhos, com nomes muito longos, e mede tudo. */
@@ -693,7 +699,7 @@ window.__qa = (async () => {
     const W = ms => new Promise(r => setTimeout(r, ms));
     closeAllModals(); lsSet(LS_TOUR, '1'); tourMode = true; // nada é guardado
     const long = 'Pneumoultramicroscopicossilicovulcanoconiótico', LONG = long + long + ' ' + long;
-    state = demoProject(); state.project.name = LONG;
+    state = demoProjectMini(); state.project.name = LONG;
     state.books.forEach(b => { b.name = LONG; b.chapters.forEach(c => c.name = LONG); }); Object.values(state.scenes).forEach(x => { x.title = LONG; x.summary = LONG; });
     state.arcs.forEach(a => a.name = LONG); state.characters.forEach(c => { c.name = LONG; c.age = long; }); state.books.forEach(b => b.mainChars = state.characters.map(c => c.id)); state.sceneries.forEach(x => x.name = LONG);
     state.refs.push({id:'rx', type:'link', title:LONG, url:'https://exemplo.pt/' + long + long, links:[{kind:'scene', id:'s2'}], created:1}, {id:'ry', type:'note', title:LONG, text:LONG, links:[{kind:'character', id:'ch1'}], created:2});
@@ -713,10 +719,32 @@ window.__qa = (async () => {
           bad.push(where + ': «' + n.nodeValue.trim().slice(0, 24) + '…» sai de ' + box.tagName + '.' + box.className + ' (' + Math.round(right - b.right) + ' px)');
       }
     };
+    state.sceneries[0].main = true; // estrela e etiqueta de Localização Principal; «O cais» (3 Cenas) fica com a sugestão
     for (const t of TABS.map(x => x[0])){ activeTab = t; renderAll(); await W(30); scan('separador ' + t); }
+    /* o que só se vê fora da visita (filtros, vistas, ampliação, painel): sem gravar nada, porque nada aqui chama save() */
+    tourMode = false;
+    viewFor().f = {char:'ch1', pov:'ch1', scenery:'sc1', st:'todo'}; viewFor().hidden.add('a3'); activeTab = 'board'; renderAll(); await W(30); scan('quadro com quatro filtros e um Arco recolhido');
+    viewFor().f = {}; viewFor().hidden.clear();
+    if (navMode() === 'rail'){ setNarrView('compact'); await W(30); scan('vista Compacta'); setZoom(.4); await W(30); scan('quadro a 40 %'); setZoom(1);
+      setNarrView('list'); await W(30); scan('vista Lista no PC'); setNarrView('board'); await W(30); }
+    for (const pv of ['overview', 'research', 'progress', 'calendar']){ filters.planView = pv; activeTab = 'plan'; renderAll(); await W(30); scan('Plano: ' + pv); }
+    filters.calMode = 'agenda'; filters.calMonth = '2027-02'; renderAll(); await W(30); scan('calendário em Agenda'); filters.calMode = 'month'; renderAll(); await W(30); scan('calendário em Mês'); filters.calMode = null; filters.calMonth = null;
+    ListUI.layout = 'rows'; for (const t of ['books', 'characters', 'arcs', 'sceneries', 'refs']){ activeTab = t; renderAll(); await W(30); scan('lista em linhas: ' + t); } ListUI.layout = 'cards';
     activeTab = 'board'; renderAll();
-    const fichas = [['Cena', () => openSceneFicha('s2')], ['Tomo', () => openBookFicha('b1')], ['Arco Narrativo', () => openArcFicha('a3')], ['Personagem', () => openCharFicha('ch1')], ['Cenário', () => openSceneryFicha('sc1')],
-      ['Link', () => openRefFicha('rx')], ['Nota', () => openRefFicha('ry')], ['apoio', () => openSupportFicha('Analepse')], ['nova Referência', () => newRefDialog(null)], ['confirmação', () => { askDeleteBook('b1'); }], ['guardar como app', installHelp]];
+    locNudge(state.sceneries.find(x => sceneryScenes(x.id).length === 3) || state.sceneries[2]); scan('sugestão de Localização Principal'); document.querySelectorAll('.toast').forEach(x => x.remove());
+    snack(LONG); scan('barra com Anular'); document.querySelectorAll('.toast').forEach(x => x.remove());
+    Coach.seen = {}; Coach.last = 0; coach('qa', LONG); scan('dica'); document.querySelectorAll('.coach').forEach(x => x.remove()); Coach.last = Infinity;
+    Tour.paused = {kind:'basic', i:9, n:32}; tourPausedUI(); scan('visita em pausa'); Tour.paused = null; tourPausedUI();
+    if (navMode() === 'rail' && innerWidth >= 1100){ Dock.on = true; openSceneFicha('s2'); await W(40); scan('ficha ao lado'); openCharFicha('ch1'); await W(40); scan('ficha ao lado, por cima'); closeAllModals(); Dock.on = false; }
+    { const fid = 'pqa' + Date.now().toString(36); localStorage.setItem(projKey(fid), JSON.stringify(state)); Projects.idx.open.push(fid); projMeta(fid).name = LONG;
+      importDialog('characters'); await W(40); scan('importar de outro projeto'); closeAllModals(); Projects.idx.open.pop(); localStorage.removeItem(projKey(fid)); }
+    { const L = document.querySelector('#landing'), rec = Projects.idx.recent; Projects.idx.recent = [projActive()]; L.hidden = false; renderLanding(L); await W(30); scan('página inicial com silhueta'); L.hidden = true; L.innerHTML = ''; Projects.idx.recent = rec; }
+    tourMode = true;
+    activeTab = 'board'; renderAll();
+    const fichas = [['Cena', () => openSceneFicha('s2')], ['Tomo', () => openBookFicha('b1')], ['Arco Narrativo', () => openArcFicha('a3')], ['Personagem', () => openCharFicha('ch1')], ['Localização', () => openSceneryFicha('sc1')],
+      ['Link', () => openRefFicha('rx')], ['Nota', () => openRefFicha('ry')], ['apoio', () => openSupportFicha('Analepse')], ['nova Referência', () => newRefDialog(null)], ['confirmação', () => { askDeleteBook('b1'); }], ['guardar como app', installHelp],
+      ['pesquisa', () => openSearch('farol')], ['pesquisa sem resultados', () => openSearch(long)], ['pesquisa nos Materiais de Apoio', () => openSearch('', 'support')], ['atalhos', shortcutsSheet], ['modelos', templateDialog],
+      ['apoio com nome original', () => openSupportFicha('Jornada do Herói') || openSupportFicha(SUPPORT[6].groups[0].items[2].n)], ['filtrar por Personagem', () => pickOne(_('Filtrar por Personagem'), _('Pesquisar Personagens…'), [], () => {})]];
     for (const [nm, open] of fichas){ open(); await W(40); scan('ficha ' + nm); closeAllModals(); }
     const sc = document.querySelector('.scene'); const r = sc.getBoundingClientRect(); boardMenu(sc, r.left + 10, r.top + 10); scan('menu'); closeMenu();
     toast(LONG); scan('aviso'); document.querySelectorAll('.toast').forEach(x => x.remove());
@@ -758,7 +786,7 @@ window.__qa = (async () => {
   await T('N04 um item de menu não é acionado pelo clique simulado ao levantar o dedo', async () => { const f = fx(); const el = sceneEl(f.a4.id), rc = el.getBoundingClientRect();
     te('pointerdown', el, rc.left + 20, rc.top + 20); await W(430); te('pointerup', window, rc.left + 20, rc.top + 20); await W(20);
     const del = [...document.querySelectorAll('.ctx-item')].find(x => x.textContent === 'Eliminar Cena'); del.click(); eq(modals().length, 0, 'ainda dentro do intervalo de proteção'); ok(document.querySelector('.ctx-menu'));
-    suppressUntil = 0; del.click(); await W(20); ok(topModal().textContent.includes('Eliminar a Cena')); });
+    suppressUntil = 0; del.click(); await W(20); ok(!state.scenes[f.a4.id] && snackEl().textContent.includes('eliminada'), 'eliminar uma Cena não pergunta: avisa e oferece Anular'); });
   await T('N05 caneta: o botão lateral é um botão direito; a ponta comporta-se como o dedo', async () => { const f = fx(); const el = sceneEl(f.a1.id), rc = el.getBoundingClientRect();
     el.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true, clientX:rc.left + 5, clientY:rc.top + 5, button:2, pointerId:9, pointerType:'pen'})); eq(lastPtr, 'mouse'); pe('pointerup', window, rc.left + 5, rc.top + 5, 2); ctxAt(el); ok(menuLabels().includes('Eliminar Cena')); closeMenu();
     el.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true, clientX:rc.left + 5, clientY:rc.top + 5, button:0, pointerId:9, pointerType:'pen', isPrimary:true})); eq(lastPtr, 'touch'); cancelPress(); });
@@ -841,7 +869,7 @@ window.__qa = (async () => {
     c.emit('data', {t:'proof', mac:await hmac(SECRET, hi.nonce + '|' + RID)}); await W(40);
     return { c, L:Sync.links.get(RID), head:take(c, 'head') };
   }
-  const remoteProject = () => { const s = sanitize(JSON.parse(JSON.stringify(demoProject()))); s.project.palette = state.project.palette; return s; };
+  const remoteProject = () => { const s = sanitize(JSON.parse(JSON.stringify(demoProjectMini()))); s.project.palette = state.project.palette; return s; };
   await T('P01 só se liga quem conhece a chave: prova errada, dispositivo desconhecido e mensagens antes da prova são recusados', async () => { fx(); commit();
     Sync.cfg.pairs = [{id:RID, name:'Telemóvel', secret:SECRET, lasts:{}, at:0}];
     const c1 = fakeConn('c'.repeat(20)); syncAccept(c1); c1.emit('open'); ok(c1.closed, 'desconhecido devia ser recusado'); ok(!Sync.links.has('c'.repeat(20)));
@@ -897,7 +925,7 @@ window.__qa = (async () => {
     eq(state.project.name, 'Projeto de demonstração', 'a visita continua'); endTour(); eq(Object.keys(state.scenes).length, 10, 'no fim da visita, fica o projeto recebido'); });
   await T('P07 Enter que fecha uma janela não chega ao botão que recebe o foco; código de ligação inválido é recusado logo', async () => { fx();
     const p = promptDialog('T', 'E', 'abc'); const ev = new KeyboardEvent('keydown', {key:'Enter', bubbles:true, cancelable:true}); topModal().querySelector('input').dispatchEvent(ev); await p; ok(ev.defaultPrevented, 'promptDialog');
-    const f = fx(); openSceneFicha(f.a1.id); btn('+ Associar Cenário').click(); await W(20); const inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'Gruta'); await W(10);
+    const f = fx(); openSceneFicha(f.a1.id); btn('+ Associar Localização').click(); await W(20); const inp = topModal().querySelector('input'); inp.focus(); setInput(inp, 'Gruta'); await W(10);
     const ev2 = new KeyboardEvent('keydown', {key:'Enter', bubbles:true, cancelable:true}); inp.dispatchEvent(ev2); await W(20); ok(ev2.defaultPrevented, 'sugestões'); eq(state.sceneries.length, 1); closeAllModals();
     syncPairEnter(); await W(20); const ci = topModal().querySelector('input'); ci.value = 'OI01ZZ'; ci.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true, cancelable:true})); await W(30);
     ok([...document.querySelectorAll('.toast')].some(t => t.textContent.includes('Código inválido')), 'aviso'); eq(modals().length, 0); });
@@ -932,7 +960,7 @@ window.__qa = (async () => {
       eq(state.books[0].name, nm, 'sem cópia de segurança, a versão daqui fica'); ok([...document.querySelectorAll('.toast')].some(t => t.textContent.includes('Não há espaço'))); eq(take(y.c, 'ack'), null); }
     finally { Storage.prototype.setItem = setItem; } });
   await T('P13 fechar a pergunta sem escolher põe a sincronização em pausa, com «Escolher a versão» nas Definições', async () => { fx(); commit();
-    const x = await linkUp('base0'); x.c.emit('data', {t:'head', hash:'zz', last:'base0', blank:false, sum:'3 Tomos'}); await W(60); topModal().querySelector('.modal-head .icon-btn').click(); await W(20);
+    const x = await linkUp('base0'); x.c.emit('data', {t:'head', hash:'zz', last:'base0', blank:false, sum:'3 Tomos'}); await W(60); topModal().querySelector('.modal-head .modal-x').click(); await W(20);
     eq(syncState(), 'conflict'); eq($('#syncBtn').dataset.state, 'conflict'); state.scenes[Object.keys(state.scenes)[0]].title = 'Durante a pausa'; commit(); flushSave(); await W(650); eq(x.c.sent.filter(m => m.t === 'full').length, 0, 'em pausa, nada é enviado');
     setTab('settings'); const b = btn('Escolher a versão', $('.sync-card')); ok(b && tipFor(b)); b.click(); await W(20); ok(topModal().textContent.includes('3 Tomos')); btn('Manter a deste dispositivo').click(); await W(60); ok(take(x.c, 'full').forced); });
   await T('P14 ficheiro com tipo perigoso nunca se abre no browser; um projeto «Novo Projeto» com Tomos renomeados não conta como em branco', async () => {
@@ -989,7 +1017,7 @@ window.__qa = (async () => {
   /* ---- V: vários projetos, página inicial, Nova Nota rápida, visitas ---- */
   const answerBtn = async label => { await W(20); const b = btn(label, topModal()); ok(b, 'sem botão ' + label); b.click(); await W(40); };
   await T('V01 o projeto da versão anterior continua onde estava e passa a ser um projeto aberto, já como guardado; projetos fora do índice voltam a ele', () => {
-    const keepIdx = lsGet(LS_PROJ), old = demoProject(); old.project.name = 'Antigo';
+    const keepIdx = lsGet(LS_PROJ), old = demoProjectMini(); old.project.name = 'Antigo';
     try { localStorage.setItem(LEGACY_KEY, JSON.stringify(old)); localStorage.setItem('narrativa.p.pSolto0001', JSON.stringify(blankProject()));
       const idx = projRepair(null); ok(idx.open.includes(LEGACY_ID) && idx.open.includes('pSolto0001')); eq(idx.meta[LEGACY_ID].name, 'Antigo'); eq(idx.meta[LEGACY_ID].dirty, false);
       eq(projKey(LEGACY_ID), LEGACY_KEY, 'sem cópia: nada pode falhar por falta de espaço'); ok(localStorage.getItem(LEGACY_KEY), 'continua lá'); }
@@ -1006,7 +1034,7 @@ window.__qa = (async () => {
     const oc = URL.createObjectURL, ac = HTMLAnchorElement.prototype.click; let saved = 0; URL.createObjectURL = () => 'blob:x'; HTMLAnchorElement.prototype.click = function(){ saved++; };
     try { ok(projMeta(p1).dirty); ok(await exportProject()); eq(saved, 1); ok(!projMeta(p1).dirty && !$('#projBtn').classList.contains('dirty'));
       closeProject(); await W(30); eq(modals().length, 0, 'sem alterações: fecha sem perguntar'); ok(projNone()); ok(!$('#landing').hidden, 'página inicial'); eq(Projects.idx.recent, [p1]);
-      ok($('#landing').textContent.includes('Projetos recentes')); btn('Reabrir', $('#landing')).click(); await W(30); eq(projActive(), p1); eq(state.scenes[f.a1.id].title, 'a1'); ok($('#landing').hidden);
+      ok($('#landing').textContent.includes('Projetos recentes')); ok($('#landing .land-thumb'), 'silhueta do projeto'); btn('Continuar', $('#landing')).click(); await W(30); eq(projActive(), p1); eq(state.scenes[f.a1.id].title, 'a1'); ok($('#landing').hidden);
       f.a1.title = 'x'; state.scenes[f.a1.id].title = 'Alterado'; commit(); flushSave(); ok(projMeta(p1).dirty);
       setTab('settings'); btn('Fechar Projeto', $('#view-page')).click(); await W(30); ok(topModal().textContent.includes('Quer guardar'));
       await answerBtn('Cancelar'); eq(projActive(), p1, 'cancelar: continua aberto');
@@ -1027,7 +1055,7 @@ window.__qa = (async () => {
     await purgeOrphanFiles(); ok(await idb.get(nr) && await idb.get(rid), 'os ficheiros de todos os projetos ficam'); });
   await T('V05 página inicial: três sugestões com explicador, sem separadores; a visita parte dela e volta a ela', async () => { closeProject(); await W(20); if (modals().length) await answerBtn('Fechar sem guardar');
     ok(projNone()); const L = $('#landing'); ok(!L.hidden && document.body.classList.contains('no-project')); eq(getComputedStyle($('#rail')).display, 'none'); ok($('#projBtn').hidden);
-    const cards = [...L.querySelectorAll('.land-card')].map(c => c.querySelector('.land-t').textContent); eq(cards, ['Criar novo Projeto', 'Abrir Projeto', 'Correr visita guiada']);
+    const cards = [...L.querySelectorAll('.land-card')].map(c => c.querySelector('.land-t').textContent); eq(cards, ['Criar novo Projeto', 'Abrir Projeto', 'Correr visita guiada', 'Começar com um exemplo', 'Começar de um modelo']);
     eq([...L.querySelectorAll('button')].filter(b => !tipFor(b)).map(b => b.textContent), []);
     commit(); flushSave(); eq(LS_KEY, null, 'nada é gravado sem projeto');
     L.querySelectorAll('.land-card')[2].click(); await W(30); ok(Tour.active && L.hidden && !$('#projBtn').hidden); endTour(); await W(20); ok(!L.hidden && projNone());
@@ -1040,7 +1068,7 @@ window.__qa = (async () => {
   await T('V06 botão Criar flutuante: só no telemóvel, com a barra de baixo; abre a folha Criar, com a Nota primeiro', async () => { fx(); commit(); fabUI(); ok($('#createFab').hidden, 'no PC, o Criar está na barra lateral');
     await phone(360, 740, async (w, d) => { const E = x => w.eval(x), b = d.querySelector('#createFab'); ok(!b.hidden, 'visível'); ok(w.tipFor(b));
       const rc = b.getBoundingClientRect(), nav = d.querySelector('#bnav').getBoundingClientRect(); ok(rc.width >= 48 && rc.right <= 360 && rc.bottom <= nav.top, 'por cima da barra de baixo');
-      b.click(); await W(30); eq([...d.querySelectorAll('.create-grid button')].map(x => x.textContent), ['Nota', 'Cena', 'Capítulo', 'Tomo', 'Arco Narrativo', 'Personagem', 'Cenário', 'Referência', 'Objetivo de pesquisa']); ok(b.hidden, 'escondido com a folha aberta');
+      b.click(); await W(30); eq([...d.querySelectorAll('.create-grid button')].map(x => x.textContent), ['Nota', 'Cena', 'Capítulo', 'Tomo', 'Arco Narrativo', 'Personagem', 'Localização', 'Referência', 'Objetivo de pesquisa']); ok(b.hidden, 'escondido com a folha aberta');
       [...d.querySelectorAll('.create-grid button')].forEach(x => ok(w.tipFor(x), 'sem explicador: ' + x.textContent));
       d.querySelector('.create-grid button').click(); await W(60); eq(E('state.refs[state.refs.length - 1].type'), 'note'); ok(d.querySelector('.modal').textContent.includes('Associada a'));
       eq(d.activeElement, d.querySelector('.modal input'), 'pronta a escrever'); w.closeAllModals(); ok(!b.hidden);
@@ -1139,13 +1167,16 @@ window.__qa = (async () => {
     ok(!state.scenes[f.a1.id].prog && !state.books[0].due && !state.plan, 'desmarcar e apagar datas deixa tudo como estava'); });
   await T('X04 o separador: visão global, Escrita, Revisão, Pesquisa e Calendário, sem erros e com explicadores', async () => { const f = fx(); setStage(f.a1.id, 'write', true); setDue(f.B1, 'review', '2030-05-05'); commit();
     setTab('plan'); ok($('#view-page h1').textContent === 'Calendarização e Objetivos'); eq($('#rail [aria-current="page"]').dataset.tab, 'plan');
-    for (const v of ['overview', 'research', 'write', 'review', 'calendar']){ [...document.querySelectorAll('.plan-nav button')].find(b => b.textContent === PLAN_VIEWS.find(x => x[0] === v)[1]).click(); await W(10); eq(filters.planView, v);
+    for (const v of ['overview', 'research', 'progress', 'calendar']){ [...document.querySelectorAll('.plan-nav button')].find(b => b.textContent === PLAN_VIEWS.find(x => x[0] === v)[1]).click(); await W(10); eq(filters.planView, v);
       eq([...$('#view-page').querySelectorAll('button, input, select, .pbar, .goal-t, .cal-ev')].filter(el => el.offsetParent && !tipFor(el)).map(el => v + ': ' + (el.textContent || el.type)).slice(0, 5), []); }
-    filters.planView = 'write'; renderAll(); const chk = [...$('#view-page').querySelectorAll('.stage-scene input[type=checkbox]')]; eq(chk.length, 6); ok(chk[0].checked);
-    chk[1].click(); ok(isDone(f.b1, 'write'), 'marca a partir do separador'); filters.planView = 'review'; renderAll(); ok($('#view-page .chk.off'), 'revisão bloqueada nas por escrever'); });
+    filters.planView = 'write'; renderAll(); eq(filters.planView, 'progress', 'Escrita e Revisão são agora uma só lista'); const chk = [...$('#view-page').querySelectorAll('.stage-scene input[type=checkbox]')]; eq(chk.length, 12, 'duas marcas por Cena'); ok(chk[0].checked && !chk[1].checked);
+    chk[2].click(); ok(isDone(f.b1, 'write'), 'marca a partir do separador'); ok($('#view-page .chk.off'), 'revisão bloqueada nas por escrever');
+    eq($('#view-page').querySelectorAll('.due-chip').length, 1, 'só o prazo que existe ocupa espaço'); ok($('#view-page .due-add'), '«+ prazo» onde não há');
+    $('#view-page .stage-scene .due-add').click(); const di = $('#view-page .stage-scene input[type=date]'); ok(di, 'o «+ prazo» dá lugar ao campo da data'); di.value = '2031-02-03'; di.dispatchEvent(new Event('change')); eq(stg(f.a1, 'write').due, '2031-02-03'); });
   await T('X05 ficha da Cena e do Tomo: marcar como completa, prazos e objetivos de pesquisa', async () => { const f = fx(); openSceneFicha(f.a1.id);
     const sec = [...topModal().querySelectorAll('.sec')].find(s => s.textContent.startsWith('Progresso')); ok(sec, 'secção Progresso');
-    sec.querySelector('.chk input').click(); await W(10); ok(isDone(state.scenes[f.a1.id], 'write'), 'marcada na ficha');
+    eq([...sec.querySelectorAll('.steps3 button')].map(b => b.getAttribute('aria-pressed')), ['true', 'false', 'false'], 'três passos: por escrever, escrita, revista');
+    sec.querySelector('.steps3 button[data-st="1"]').click(); await W(10); ok(isDone(state.scenes[f.a1.id], 'write'), 'marcada na ficha');
     const due = sec.querySelector('input[type=date]'); due.value = '2030-03-03'; due.dispatchEvent(new Event('change')); eq(stg(state.scenes[f.a1.id], 'write').due, '2030-03-03');
     btn('+ Objetivo de pesquisa', topModal()).click(); await W(20); ok(topModal().textContent.includes('Objetivo de pesquisa')); const g = state.goals[state.goals.length - 1]; eq(g.target, {kind:'scene', id:f.a1.id});
     closeAllModals(); openBookFicha(f.B1.id); ok([...topModal().querySelectorAll('.sec')].some(s => s.textContent.startsWith('Progresso') && s.querySelector('.pbar'))); });
@@ -1163,7 +1194,9 @@ window.__qa = (async () => {
     eq(JSON.stringify(sanitize(JSON.parse(JSON.stringify(state)))), JSON.stringify(state), 'e continua igual depois da normalização'); });
   await T('X09 correções da revisão: ficha atualiza ao marcar, datas só completas, projeto com objetivos não é «em branco», .ics com acentos e às 23:30', async () => { const f = fx();
     openSceneFicha(f.a1.id); const sec = () => [...topModal().querySelectorAll('.sec')].find(s => s.textContent.startsWith('Progresso'));
-    sec().querySelector('.chk input').click(); await W(10); ok(sec().textContent.includes('Escrita') && !sec().querySelector('.chk.off'), 'a ficha mostra logo a Cena escrita e liberta a revisão'); closeAllModals();
+    sec().querySelector('.steps3 button[data-st="1"]').click(); await W(10); eq(sec().querySelector('.steps3 [aria-pressed="true"]').dataset.st, '1', 'a ficha mostra logo a Cena escrita');
+    sec().querySelector('.steps3 button[data-st="2"]').click(); await W(10); ok(isDone(state.scenes[f.a1.id], 'review')); sec().querySelector('.steps3 button[data-st="0"]').click(); await W(10); ok(!state.scenes[f.a1.id].prog, 'voltar a «por escrever» limpa as duas marcas');
+    sec().querySelector('.steps3 button[data-st="2"]').click(); await W(10); ok(isDone(state.scenes[f.a1.id], 'write') && isDone(state.scenes[f.a1.id], 'review'), 'de «por escrever» para «revista» fica também escrita'); closeAllModals();
     const inp = dueInput(null, v => { inp._set = v; }, 'x'); inp.value = '0202-01-01'; inp.dispatchEvent(new Event('change')); eq(inp._set, undefined, 'ano incompleto não grava'); inp.value = '2027-01-01'; inp.dispatchEvent(new Event('change')); eq(inp._set, '2027-01-01');
     const bp = blankProject(); ok(isBlankProject(bp)); bp.goals = [{id:'g', title:'x'}]; ok(!isBlankProject(bp), 'com objetivos não é em branco');
     const e = {key:'k', date:'2030-12-31', time:'23:30', title:'Revisão: «Ação» à noite — café ☕ e mais texto para passar dos setenta e cinco octetos', kind:'goal', done:false, desc:'x'};
@@ -1262,20 +1295,20 @@ window.__qa = (async () => {
   const bodyAt = chId => document.querySelector(`.ch-body[data-chapter="${chId}"]`);
   await T('Z01 barra lateral: Criar e oito áreas, a área à vista assinalada; Definições na roda dentada, que volta atrás; topo numa linha', async () => { fx();
     eq(document.body.dataset.nav, 'rail'); ok(!$('#bnav').offsetParent, 'sem barra de baixo no PC');
-    eq([...document.querySelectorAll('#rail .nav-item')].map(b => b.textContent), ['Narrativa', 'Plano', 'Tomos', 'Arcos', 'Personagens', 'Cenários', 'Referências', 'Apoio']);
+    eq([...document.querySelectorAll('#rail .nav-item')].map(b => b.textContent), ['Narrativa', 'Plano', 'Tomos', 'Arcos', 'Personagens', 'Localizações', 'Referências', 'Apoio']);
     eq($('#rail [aria-current="page"]').dataset.tab, 'board');
     document.querySelector('#rail .nav-item[data-tab="characters"]').click(); eq(activeTab, 'characters'); eq($('#rail [aria-current="page"]').dataset.tab, 'characters'); ok(!document.querySelector('.el-tabs'), 'no PC, sem o seletor de Elementos');
     $('#setBtn').click(); eq(activeTab, 'settings'); ok($('#setBtn').classList.contains('on') && $('#view-page .settings'));
     $('#setBtn').click(); eq(activeTab, 'characters', 'outro clique volta à área em que estava');
     [...document.querySelectorAll('#rail button, #topbar button')].forEach(b => ok(tipFor(b), 'sem explicador: ' + (b.id || b.textContent)));
     ok($('#topbar').getBoundingClientRect().height <= 64, 'a barra de topo tem uma só linha'); const nm = $('#projName'); ok(nm.scrollWidth <= nm.clientWidth + 1, 'o nome do projeto ficou cortado'); });
-  await T('Z02 ajuda: as duas visitas; durante a visita, a barra lateral fica inativa', async () => { fx(); $('#tourBtn').click(); eq(menuLabels(), ['Visita guiada', 'Visita detalhada']); eq($('#tourBtn').getAttribute('aria-expanded'), 'true');
+  await T('Z02 ajuda: as duas visitas; durante a visita, a barra lateral fica inativa', async () => { fx(); $('#tourBtn').click(); eq(menuLabels(), ['Visita guiada', 'Visita detalhada', 'Atalhos de teclado']); eq($('#tourBtn').getAttribute('aria-expanded'), 'true');
     await menuClick('Visita detalhada'); ok(Tour.active && Tour.kind === 'deep'); ok($('#rail').inert); endTour(); ok(!$('#rail').inert); });
   await T('Z03 Criar: nove opções, cada uma cria o que diz', async () => { const f = fx();
-    $('#createBtn').click(); eq(menuLabels(), ['Cena', 'Capítulo', 'Tomo', 'Arco Narrativo', 'Personagem', 'Cenário', 'Nota', 'Referência', 'Objetivo de pesquisa']);
+    $('#createBtn').click(); eq(menuLabels(), ['Cena', 'Capítulo', 'Tomo', 'Arco Narrativo', 'Personagem', 'Localização', 'Nota', 'Referência', 'Objetivo de pesquisa']);
     document.querySelectorAll('.create-menu .ctx-item').forEach(b => ok(tipFor(b), 'sem explicador: ' + b.textContent));
     await menuClick('Personagem'); ok(topModal().textContent.includes('Ficha da Personagem')); closeAllModals();
-    $('#createBtn').click(); await menuClick('Cenário'); ok(topModal().textContent.includes('Cenário')); closeAllModals();
+    $('#createBtn').click(); await menuClick('Localização'); ok(topModal().textContent.includes('Localização')); closeAllModals();
     const nb = state.books.length; $('#createBtn').click(); await menuClick('Tomo'); eq(state.books.length, nb + 1); ok(topModal().textContent.includes('Ficha do Tomo')); await W(50); eq(document.activeElement, topModal().querySelector('input'), 'nome pronto a mudar'); closeAllModals();
     $('#createBtn').click(); await menuClick('Nota'); ok(topModal().textContent.includes('Associada a')); closeAllModals();
     $('#createBtn').click(); await menuClick('Referência'); ok(topModal().textContent.includes('Nova Referência')); closeAllModals();
@@ -1333,7 +1366,7 @@ window.__qa = (async () => {
       q('.nl-row').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles:true, cancelable:true, clientX:100, clientY:200})); ok(qa('.ctx-item').some(x => x.textContent === 'Criar nova Cena aqui'), 'menu da Cena'); w.closeMenu();
       q('.view-toggle button[data-view="board"]').click(); await W(30); ok(q('#narrList').hidden && !q('#board-scroll').hidden, 'Quadro'); ok(q('.corner .view-toggle'), 'a escolha está no canto do quadro');
       q('.corner .view-toggle button[data-view="list"]').click(); await W(30); ok(!q('#narrList').hidden);
-      q('#bnav .nav-item[data-tab="elements"]').click(); await W(30); eq(E('activeTab'), 'books'); eq(qa('.el-tabs button').map(b => b.textContent), ['Tomos', 'Arcos Narrativos', 'Personagens', 'Cenários']);
+      q('#bnav .nav-item[data-tab="elements"]').click(); await W(30); eq(E('activeTab'), 'books'); eq(qa('.el-tabs button').map(b => b.textContent), ['Tomos', 'Arcos Narrativos', 'Personagens', 'Localizações']);
       qa('.el-tabs button')[2].click(); await W(30); eq(E('activeTab'), 'characters'); eq(q('#bnav [aria-current="page"]').dataset.tab, 'elements');
       q('#bnav .nav-item[data-tab="more"]').click(); await W(30); eq(qa('.sheet-row').map(b => b.textContent), ['Materiais de Apoio', 'Definições do Projeto', 'Visita guiada', 'Visita detalhada']);
       qa('.sheet-row')[1].click(); await W(400); ok(q('#setDrawer').classList.contains('open') && E('activeTab') === 'settings', 'Definições na barra lateral'); E('closeDrawer()'); await W(30); eq(E('activeTab'), 'characters');
@@ -1380,10 +1413,10 @@ window.__qa = (async () => {
     ok($('.lang-card') && $('.a11y-card')); ok($('#langBtn') && $('#langBtn').textContent === 'PT'); });
   await T('Q05 «A escrita vai aqui» e «A revisão vai aqui»: no quadro e na Lista, antes da primeira Cena por escrever e por rever', async () => {
     const f = fx(); setTab('board'); renderAll(); await W(30);
-    const marks = () => [...document.querySelectorAll('#lines .frontier text')].map(t => t.textContent);
+    const marks = () => [...document.querySelectorAll('#lines .frontier text:not(.fr-top)')].map(t => t.textContent);
     eq(marks(), ['A escrita vai aqui'], 'nada escrito: só a escrita, no início');
     const order = narrOrder(); setStage(order[0], 'write', true); setStage(order[1], 'write', true); await W(30);
-    eq(marks(), ['A escrita vai aqui', 'A revisão vai aqui']);
+    eq(marks(), ['A escrita vai aqui', 'A revisão vai aqui']); eq([...document.querySelectorAll('#lines .fr-top')].map(t => t.textContent), marks(), 'a legenda repete-se no cimo');
     eq(frontiers().map(x => x.id), [order[2], order[0]]);
     const x = parseFloat(document.querySelector('#lines .fr-write path').getAttribute('d').slice(1)); ok(Math.abs(x - (cur['s:' + order[2]].x - 9)) < 2, 'a linha fica antes da Cena');
     order.forEach(id => { setStage(id, 'write', true); setStage(id, 'review', true); }); await W(30); eq(marks(), [], 'tudo revisto: sem linhas');
@@ -1403,7 +1436,7 @@ window.__qa = (async () => {
     } finally { lsSet(LS_A11Y, '{}'); applyA11y(); }
     eq(document.body.dataset.fs, 'm'); const f = fx(); f.A.hue = 10; f.A.sat = 72; commit(); recolorArcs(); commit(); eq([f.A.hue, f.A.sat], ARC_TONES[0]); undo(); eq([arcById(f.A.id).hue, arcById(f.A.id).sat], [10, 72]); });
   await T('Q08 ficha da Cena: a fita do percurso — nomes, posição, linhas até às caixas das Cenas, bifurcação e convergência; a ficha não fecha ao navegar e desliza', async () => {
-    state = demoProject(); state.scenes.s7.convergeTo = 's9'; commit(); renderAll(); closeAllModals();
+    state = demoProjectMini(); state.scenes.s7.convergeTo = 's9'; commit(); renderAll(); closeAllModals();
     const q = s => topModal().querySelector(s), qa = s => [...topModal().querySelectorAll(s)], names = s => qa(s + ' .ft-node').map(n => n.textContent + (n.classList.contains('alt') ? '*' : ''));
     const title = () => q('.ficha input').value, cssColor = css => { const d = h('span', {style:{color:css}}); document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; };
     openSceneFicha('s1'); const box = topModal();
@@ -1411,9 +1444,11 @@ window.__qa = (async () => {
     eq(qa('.ft-arrow').map(b => b.dataset.nav + (b.disabled ? ' ×' : '')), ['narr-prev ×', 'arc-prev ×', 'narr-next', 'arc-next'], 'setas agrupadas por lado: anteriores à esquerda, seguintes à direita'); eq(names('.ft-trk.narr .ft-c.next'), ['A casa da avó']);
     eq(getComputedStyle(q('[data-nav="narr-next"]')).backgroundColor, 'rgb(255, 255, 255)', 'a seta do livro é branca'); eq(getComputedStyle(q('[data-nav="arc-next"]')).backgroundColor, cssColor(arcColor(arcById('a1'))), 'a do Arco tem a cor do Arco');
     ok(parseFloat(getComputedStyle(q('.ft-trk.arc .ft-here'), '::after').height) >= 6, 'linhas grossas'); eq(getComputedStyle(q('.ft-trk.narr'), '::before').content, 'none', 'a linha não atravessa a ficha');
-    ok(Math.abs(q('.ft-trk.narr .ft-c.next .ft-node').getBoundingClientRect().left - q('.ft-trk.narr .ft-here').getBoundingClientRect().right - parseFloat(getComputedStyle(q('.ft-trk.narr .ft-here'), '::after').width) + 2) < 1.5, 'a linha acaba na caixa da Cena seguinte');
+    { const cell = q('.ft-trk.narr .ft-c.next'), cr = cell.getBoundingClientRect(), nr = cell.querySelector('.ft-node').getBoundingClientRect(), fr = q('.scn-fita').getBoundingClientRect(), ln = getComputedStyle(cell, '::after');
+      ok(Math.abs(nr.right - cr.right) < 1.5 && ln.display !== 'none' && ln.content !== 'none' && cr.width > nr.width - 1, 'a linha estica-se até à caixa da Cena seguinte, encostada à direita: ' + JSON.stringify([nr.right, cr.right, ln.display, ln.width, cr.width, nr.width])); ok(fr.right - cr.right < 30, 'e a fita ocupa a largura toda da ficha');
+      eq(qa('.ft-cap').map(x => x.textContent), ['Ordem Narrativa', 'Ordem Cronológica'], 'cada linha tem a sua legenda'); }
     eq(getComputedStyle(q('.ft-trk.narr .ft-here'), '::before').display, 'none', 'no início do livro não há linha para trás'); eq(getComputedStyle(q('[data-nav="arc-next"]')).backgroundImage, 'none', 'sem bifurcação, a seta tem só a cor do Arco'); ok(!q('.modal-head .ft-arrow') && !q('.modal-head button:not(.icon-btn)'), 'a linha do título fica só com o título e o ✕');
-    ok(q('.scn-fita').offsetHeight <= 64, 'a fita ocupa pouco: ' + q('.scn-fita').offsetHeight + ' px');
+    ok(q('.scn-fita').offsetHeight <= 100, 'a fita, com as duas legendas, ocupa pouco: ' + q('.scn-fita').offsetHeight + ' px');
     q('[data-nav="narr-next"]').click(); await W(20);
     ok(topModal() === box && modals().length === 1, 'é a mesma ficha, não uma nova'); eq(title(), 'A casa da avó'); eq(openModals[0].entity, {kind:'scene', id:'s2'}); eq(document.activeElement.dataset.nav, 'narr-next', 'o foco fica na seta');
     ok(box.classList.contains('slide-next'), 'a caixa desliza'); eq(getComputedStyle(box).animationName, 'ficha-next'); eq(getComputedStyle(q('[data-nav="narr-next"]')).animationName, 'ft-hold-next', 'as setas ficam paradas');
@@ -1440,7 +1475,7 @@ window.__qa = (async () => {
     await W(560); ok(!box.classList.contains('slide-next') && !box.classList.contains('slide-prev'), 'a animação termina');
     closeAllModals(); fx(); });
   await T('Q09 ficha da Cena: ← e → percorrem o livro e, com Shift, o Arco Narrativo — não ao escrever, nem com outra janela por cima, nem na visita', async () => {
-    state = demoProject(); commit(); renderAll(); closeAllModals(); openSceneFicha('s2'); const box = topModal();
+    state = demoProjectMini(); commit(); renderAll(); closeAllModals(); openSceneFicha('s2'); const box = topModal();
     const title = () => box.querySelector('.ficha input').value;
     const key = (k, o, el) => { const ev = new KeyboardEvent('keydown', Object.assign({key:k, bubbles:true, cancelable:true}, o || {})); (el || document.body).dispatchEvent(ev); return ev.defaultPrevented; };
     ok(key('ArrowRight'), 'a tecla é usada'); eq(title(), 'Luz apagada'); eq(modals().length, 1); key('ArrowLeft'); eq(title(), 'A casa da avó');
@@ -1450,13 +1485,13 @@ window.__qa = (async () => {
     key('ArrowLeft'); key('ArrowLeft'); eq(title(), 'Inês desembarca na ilha', 'no início do livro, ← não faz nada');
     box.classList.remove('slide-next', 'slide-prev'); key('ArrowRight', {repeat:true}); eq(title(), 'A casa da avó'); ok(!box.classList.contains('slide-next'), 'tecla premida: sem animação');
     const inp = box.querySelector('.ficha input'); inp.focus(); ok(!key('ArrowLeft', null, inp), 'num campo de texto, a seta é do texto'); ok(!key('ArrowLeft', null, box.querySelector('.ficha textarea'))); ok(!key('ArrowLeft', null, box.querySelector('.ficha select'))); eq(title(), 'A casa da avó');
-    const chk = box.querySelector('.ficha input[type=checkbox]'); ok(chk, 'há caixas de seleção na ficha'); ok(key('ArrowRight', null, chk), 'numa caixa de seleção, navega'); eq(title(), 'Luz apagada'); key('ArrowLeft');
+    const chk = box.querySelector('.ficha .steps3 button'); ok(chk, 'há botões de estado na ficha'); ok(key('ArrowRight', null, chk), 'num botão, navega'); eq(title(), 'Luz apagada'); key('ArrowLeft');
     ok(!key('ArrowRight', {ctrlKey:true}) && !key('ArrowRight', {altKey:true}), 'com Ctrl ou Alt, não'); eq(title(), 'A casa da avó');
     openCharFicha(state.characters[0].id); ok(!key('ArrowRight'), 'com outra ficha por cima, não'); openModals[openModals.length - 1].close(); eq(title(), 'A casa da avó');
     Tour.active = true; try { key('ArrowRight'); eq(title(), 'A casa da avó', 'na visita guiada, as setas são da visita'); } finally { Tour.active = false; }
     closeAllModals(); ok(!key('ArrowRight'), 'sem ficha aberta, nada'); fx(); });
   await T('Q10 fita e setas: no PC as setas ficam fora da ficha, a meio da altura; em janelas estreitas, nas pontas das linhas; no telemóvel, a fita fica fixa em baixo', async () => {
-    state = demoProject(); commit(); flushSave();
+    state = demoProjectMini(); commit(); flushSave();
     const probe = async (w, hh) => { let r; await phone(w, hh, async (win, d) => { win.eval("closeAllModals(); quietModals = true; openSceneFicha('s2'); quietModals = false;"); await W(80);
       const m = d.querySelector('.modal.scene-modal'), box = m.getBoundingClientRect(), f = d.querySelector('.scn-fita').getBoundingClientRect(), A = k => d.querySelector('.ft-arrow[data-nav="' + k + '"]').getBoundingClientRect();
       const all = ['narr-prev', 'narr-next', 'arc-prev', 'arc-next'].map(A), mid = () => (A('narr-prev').top + A('arc-prev').bottom) / 2, mid0 = mid();
@@ -1472,6 +1507,290 @@ window.__qa = (async () => {
     ok(Math.abs(r.fitaTop - r.headBottom) < 8, 'PC: a fita fica sob o título'); eq(r.names, 'Inês desembarca na ilha|Luz apagada|Inês desembarca na ilha|A carta por abrir|Duarte foge de casa');
     r = await probe(800, 900); ok(!r.wide && r.inside && r.inFita && r.noScrollX && r.level, 'janela estreita: setas nas pontas das linhas da fita ' + JSON.stringify(r)); ok(Math.abs(r.fitaTop - r.headBottom) < 8, 'janela estreita: sob o título');
     r = await probe(390, 800); ok(!r.wide && r.inside && r.inFita && r.noScrollX && r.short, 'telemóvel ' + JSON.stringify(r)); ok(Math.abs(r.fitaBottom - r.vh) < 2, 'telemóvel: a fita fica fixa em baixo: ' + r.fitaBottom + ' de ' + r.vh); });
+  await T('Q11 etapa 1: dias da semana curtos no telemóvel, bifurcações na ficha do Arco, cápsulas e gravação na barra de topo, índice das Definições', async () => {
+    const f = fx(); const br = newArc('Ramo X', f.A.id, f.a2.id); f.b2.convergeTo = f.a3.id; commit(); const B = arcById(f.b2.arcId);
+    openArcFicha(f.A.id); const lk = id => [...topModal().querySelectorAll('.arc-card[data-scene="' + id + '"] .arc-link')].map(x => x.textContent);
+    eq(lk(f.a2.id), ['Ramo X'], 'a bifurcação aparece na Cena onde acontece'); eq(lk(f.a3.id), [B.name], 'a convergência aparece na Cena que a recebe'); eq(lk(f.a1.id), []);
+    const l = topModal().querySelector('.arc-link'); ok(tipFor(l), 'explicador da etiqueta'); l.click(); eq(modals().length, 2); eq(topModal().querySelector('input').value, 'Ramo X', 'abre a ficha do Ramo'); closeAllModals();
+    openArcFicha(B.id); ok(topModal().querySelector('.arc-card[data-scene="' + f.b2.id + '"] .arc-link'), 'e na Cena de onde parte'); closeAllModals();
+    eq([...document.querySelectorAll('#topbar .tb-group')].map(g => [...g.children].map(b => b.id).join('+')), ['undoBtn+redoBtn', 'dualBtn+installBtn']);
+    setSaveUI('ok'); const lbl = $('#saveState .lbl'); ok(innerWidth > 900 && lbl.getBoundingClientRect().width > 20, 'no PC, a gravação lê-se por extenso'); eq(lbl.textContent, 'Guardado');
+    setTab('settings'); await W(30); const toc = [...document.querySelectorAll('.set-toc button')], cards = [...document.querySelectorAll('#view-page .settings > .card')];
+    ok(toc.length >= 8 && toc.length <= cards.length, 'um item por cartão com título: ' + toc.length); eq(toc[0].textContent, 'Nome do Projeto'); ok(toc.every(b => tipFor(b)), 'explicadores do índice');
+    ok(document.querySelector('.set-toc').getBoundingClientRect().width > 100, 'o índice está à vista no PC'); const pg = $('#view-page');
+    pg.scrollTop = pg.scrollHeight; pg.dispatchEvent(new Event('scroll')); await W(30); ok(toc[toc.length - 1].classList.contains('on'), 'no fim, o último cartão fica assinalado');
+    pg.scrollTop = 0; pg.dispatchEvent(new Event('scroll')); await W(30); ok(toc[0].classList.contains('on'), 'no início, o primeiro'); setTab('board');
+    await phone(390, 800, async (w, d) => { w.eval("filters.calMode = 'month'"); w.setTab('plan'); await W(30); [...d.querySelectorAll('.plan-nav button')].find(b => b.textContent === w.eval("PLAN_VIEWS.find(x => x[0] === 'calendar')[1]")).click(); await W(40);
+      const dw = [...d.querySelectorAll('.cal-dow')]; eq(dw.length, 7); ok(dw.every(x => x.getBoundingClientRect().height < 30), 'os nomes dos dias não se partem em duas linhas');
+      eq(dw.map(x => x.querySelector('.dow-s').textContent.length <= 3 && w.getComputedStyle(x.querySelector('.dow-l')).display === 'none').filter(Boolean).length, 7);
+      }); });
+  /* ---- primeira auditoria, propostas 3 a 10 e 12 ---- */
+  await T('R01 quadro: estado em cada Cena, um clique avança; a linha «vai aqui» acompanha', async () => { const f = fx();
+    const st = id => sceneEl(id).querySelector('.scene-st'); ok(st(f.a1.id) && tipFor(st(f.a1.id)).title === 'Por escrever', 'marca e explicador');
+    st(f.a1.id).click(); await W(20); ok(isDone(f.a1, 'write') && !isDone(f.a1, 'review')); ok(st(f.a1.id).classList.contains('wr')); eq(modals().length, 0, 'clicar na marca não abre a ficha');
+    st(f.a1.id).click(); await W(20); ok(isDone(f.a1, 'review') && st(f.a1.id).classList.contains('rv')); st(f.a1.id).click(); await W(20); ok(!f.a1.prog, 'o terceiro clique volta a «por escrever»');
+    sceneEl(f.a1.id).click(); await W(20); eq(modals().length, 1, 'o resto do cartão continua a abrir a ficha'); });
+  await T('R02 filtros: Personagem, POV, Localização e estado destacam Cenas; etiqueta com ✕ e contador; nada muda no projeto', async () => { const f = fx();
+    const ana = newCharacter('Ana'), lug = newScenery('Farol'); f.a1.chars.push(ana.id); f.b2.pov = ana.id; f.a3.sceneries.push(lug.id); setStage(f.a1.id, 'write', true); commit(); const snap = JSON.stringify(state);
+    const dim = () => ['a1', 'b1', 'a2', 'a3', 'b2', 'a4'].filter(t => sceneEl(f[t].id).classList.contains('dim')).join();
+    ok($('#boardBar') && !$('#boardBar').hidden && $('#filterBtn') && tipFor($('#filterBtn')), 'barra do quadro com Filtrar'); eq(dim(), '');
+    $('#filterBtn').click(); await W(20); eq(menuLabels(), ['Personagem…', 'Personagem POV…', 'Localização…', 'Por escrever', 'Escritas, por rever', 'Revistas']); ok([...document.querySelectorAll('.ctx-item')].every(x => tipFor(x)), 'explicadores do menu');
+    await menuClick('Personagem…'); await pickAC(topModal().querySelector('input'), 'An', 'Ana'); await W(20); eq(dim(), 'b1,a2,a3,a4', 'Personagem: presente ou POV');
+    eq($('#boardBar .f-count').textContent, '2 de 6 Cenas'); eq($('#boardBar .f-chip').textContent.replace('✕', ''), 'Personagem: Ana');
+    setFilter('st', 'written'); eq(dim(), 'b1,a2,a3,b2,a4', 'os filtros somam-se'); setFilter('char', null); setFilter('st', 'todo'); eq(dim(), 'a1'); setFilter('st', null);
+    setFilter('pov', ana.id); eq(dim(), 'a1,b1,a2,a3,a4'); setFilter('pov', null); setFilter('scenery', lug.id); eq(dim(), 'a1,b1,a2,b2,a4');
+    $('#boardBar .f-chip .chip-x').click(); await W(20); eq(dim(), '', 'o ✕ retira o filtro'); ok(!$('#boardBar .f-count')); eq(JSON.stringify(state), snap, 'filtrar não altera o projeto'); });
+  await T('R03 visto de cada Arco Narrativo: sem visto, a faixa recolhe-se e as Cenas e linhas desse Arco deixam de se ver', async () => { const f = fx(); const snap = JSON.stringify(state);
+    const ck = () => document.querySelector('.lane-label[data-arc="' + f.Bq.id + '"] .lane-ck'), y0 = target['s:' + f.a1.id].y, h0 = L.bodyH;
+    ok(ck() && ck().getAttribute('aria-checked') === 'true' && tipFor(ck())); ck().click(); await W(20); settle();
+    eq(modals().length, 0, 'o visto não abre a ficha'); eq(ck().getAttribute('aria-checked'), 'false'); ok(sceneEl(f.b1.id).classList.contains('gone') && getComputedStyle(sceneEl(f.b1.id)).display === 'none');
+    eq(L.bodyH, h0 - B.LANE + B.LANE_OFF, 'a faixa fica fina'); eq(target['s:' + f.a1.id].y, y0); ok(!$('#lines').innerHTML.includes(arcStroke(f.Bq)), 'sem linhas desse Arco');
+    eq($('#boardBar .f-chip').textContent.replace('✕', ''), '1 Arco recolhido'); const r = document.querySelector('.lane-row.off').getBoundingClientRect(); ok(!hoverAt(L.chapters[0].x + 30, L.laneTop[1] + 5), 'nada se cria numa faixa recolhida');
+    document.querySelector('.lane-label[data-arc="' + f.Bq.id + '"] .lane-name').click(); await W(20); eq(modals().length, 1, 'o nome continua a abrir a ficha'); closeAllModals();
+    ck().click(); await W(20); ok(!sceneEl(f.b1.id).classList.contains('gone')); eq(L.bodyH, h0); eq(JSON.stringify(state), snap); layoutInvariants(); });
+  await T('R04 vistas no PC: Quadro, Compacta e Lista; arrastar na Lista muda a ordem', async () => { const f = fx(); if (navMode() !== 'rail') return;
+    const seg = k => $('#boardBar .view-seg button[data-v="' + k + '"]'); ok(seg('board') && seg('compact') && seg('list') && [seg('board'), seg('compact'), seg('list')].every(b => tipFor(b)), 'três vistas com explicador');
+    eq(seg('board').getAttribute('aria-pressed'), 'true'); const h1 = sceneEl(f.a1.id).getBoundingClientRect().height; eq(Math.round(h1), 56);
+    seg('compact').click(); await W(30); settle(); eq(B.SH, 28); eq(Math.round(sceneEl(f.a1.id).getBoundingClientRect().height), 28, 'as Cenas reduzem-se a etiquetas'); ok(document.body.classList.contains('dens-compact')); layoutInvariants();
+    ok(sceneEl(f.a1.id).querySelector('.scene-st').offsetParent, 'o estado continua à vista'); await dragTo(sceneEl(f.a1.id), dropX('scene', f.a1.id, f.c1.id, 2)); eq(titles()[0][0], ['b1', 'a2', 'a1'], 'arrastar funciona na vista Compacta'); snackEl().querySelector('.snack-undo').click(); await W(30);
+    seg('list').click(); await W(30); ok(!$('#narrList').hidden && $('#board-scroll').hidden, 'Lista no PC'); ok(!$('#narrList .nl-top'), 'a escolha da vista está na barra'); eq(seg('list').getAttribute('aria-pressed'), 'true');
+    const row = t => [...document.querySelectorAll('.nl-row')].find(x => x.querySelector('b').textContent === t), ra = row('a1').getBoundingClientRect(), rb = row('a2').getBoundingClientRect();
+    const me = (type, el, x, y) => el.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true, clientX:x, clientY:y, button:0, pointerId:1, pointerType:'mouse'}));
+    me('pointerdown', row('a1'), ra.left + 60, ra.top + 10); me('pointermove', window, ra.left + 60, ra.top + 30); me('pointermove', window, rb.left + 60, rb.bottom - 6); ok(document.querySelector('.nl-drop') && !document.querySelector('.nl-drop').hidden, 'linha a mostrar onde fica');
+    me('pointerup', window, rb.left + 60, rb.bottom - 6); await W(30); eq(titles()[0][0], ['b1', 'a2', 'a1'], 'arrastar na Lista reordena'); ok(snackEl().textContent.includes('Cena «a1» movida')); eq(modals().length, 0, 'largar não abre a ficha');
+    seg('board').click(); await W(30); eq(B.SH, 56); ok($('#narrList').hidden); });
+  await T('R05 ampliação: − + 100 % e Ajustar; arrastar e criar continuam certos com o quadro reduzido; mini-mapa', async () => { const f = fx(); if (navMode() !== 'rail') return;
+    const z = $('#zoomBox'); ok(z && !z.hidden && [...z.querySelectorAll('button')].every(b => tipFor(b)), 'controlo de ampliação com explicadores'); eq(z.querySelector('.zoom-pct').textContent, '100%');
+    z.querySelector('[data-z="out"]').click(); z.querySelector('[data-z="out"]').click(); z.querySelector('[data-z="out"]').click(); eq(Z(), .7); eq(z.querySelector('.zoom-pct').textContent, '70%'); settle();
+    const r = sceneEl(f.a1.id).getBoundingClientRect(); ok(Math.abs(r.width - 140 * .7) < 1.5, 'as Cenas ficam mais pequenas: ' + r.width);
+    const bl = $('#board').getBoundingClientRect().left, cx = bl + (L.chapters[0].x + B.CP + B.SW + 10) * Z(); await dragTo(sceneEl(f.a1.id), cx); eq(titles()[0][0], ['b1', 'a1', 'a2'], 'largar cai no sítio certo a 70 %'); settle();
+    const br = $('#bodyLayer').getBoundingClientRect(), c2 = L.chapters[1]; const at = hoverAt((br.left + (c2.x + B.CP + B.SW + 4) * Z() - br.left) / Z(), L.laneTop[0] + 20); ok(at && at.chId === f.c2.id && at.idx === 1, 'criar com o rato aponta para o sítio certo: ' + JSON.stringify(at && [at.kind, at.idx]));
+    key('0'); eq(Z(), 1, 'tecla 0 repõe'); key('-'); eq(Z(), .9); key('+'); eq(Z(), 1);
+    for (let i = 0; i < 30; i++){ const c = {id:uid('c'), name:'Cap ' + i, scenes:[]}; f.B2.chapters.push(c); insertScene(c.id, 0, f.A.id).title = 'x' + i; } commit(); settle(); await W(30);
+    const mm = $('#miniMap'); ok(mm && !mm.hidden && tipFor(mm), 'mini-mapa quando a narrativa não cabe'); const sc = $('#board-scroll'), mr = mm.getBoundingClientRect();
+    pe('pointerdown', mm, mr.right - 6, mr.top + 6); await W(30); ok(sc.scrollLeft > 500, 'clicar no mini-mapa leva a esse ponto: ' + sc.scrollLeft); pe('pointerup', mm, mr.right - 6, mr.top + 6);
+    z.querySelector('[data-z="fit"]').click(); await W(30); ok(Z() < 1 && (L.width * Z() <= sc.clientWidth + 2 || Z() === .3), 'Ajustar: a narrativa toda cabe, ou fica no mínimo de 30 % (' + Z() + ')'); eq(sc.scrollLeft, 0); setZoom(1); });
+  await T('R06 pesquisa em todo o projeto e ações; atalhos de teclado e a sua folha', async () => { const f = fx(); const ana = newCharacter('Ana Farol'); f.a2.summary = 'Uma tempestade no farol'; state.refs.push({id:'rz', type:'note', title:'Ideia do farol', text:'', links:[], created:1}); commit();
+    ok($('#searchBtn') && $('#searchBtn').offsetParent && tipFor($('#searchBtn')), 'botão de pesquisa no topo'); key('/'); await W(20); const inp = () => topModal().querySelector('.find-inp'); ok(inp() && document.activeElement === inp(), '/ abre a pesquisa');
+    const groups = () => [...topModal().querySelectorAll('.find-group')].map(x => x.textContent), items = () => [...topModal().querySelectorAll('.find-item .find-l')].map(x => x.textContent);
+    eq(groups(), ['Ações'], 'sem texto, mostra as ações'); setInput(inp(), 'farol'); eq(groups().slice(0, 3), ['Cenas', 'Personagens', 'Referências']); eq(items().slice(0, 3), ['a2', 'Ana Farol', 'Ideia do farol'], 'procura também no resumo, sem distinguir maiúsculas');
+    key('ArrowDown', {}, inp()); key('Enter', {}, inp()); await W(30); ok(!document.querySelector('.find-modal') && topModal().querySelector('input').value === 'Ana Farol', 'Enter abre a ficha escolhida'); closeAllModals();
+    key('k', {ctrlKey:true}); await W(20); setInput(inp(), 'tema claro'); eq(items()[0], 'Tema claro'); key('Enter', {}, inp()); await W(30); eq(themePref(), 'light', 'a pesquisa aceita ações'); setTheme('dark');
+    openSearch(); setInput(inp(), 'nova personagem'); ok(items().includes('Criar Personagem') || items().some(x => /Personagem/.test(x)), 'ação de criar'); setInput(inp(), 'zzzz'); ok(topModal().querySelector('.find-none')); key('Escape'); await W(20); eq(modals().length, 0);
+    key('?'); await W(20); ok(document.querySelector('.keys-modal') && topModal().querySelectorAll('.key-row').length >= 15, 'folha de atalhos'); key('Escape'); await W(20);
+    key('3'); eq(activeTab, 'books'); key('1'); eq(activeTab, 'board'); key('n'); await W(20); ok(topModal().textContent.includes('Nova Cena'), 'N abre «Nova Cena»'); const ti = topModal().querySelector('input'); key('2', {}, ti); eq(activeTab, 'board', 'a escrever, as teclas não são atalhos'); closeAllModals(); });
+  await T('R07 barra com «Anular»: eliminar uma Cena, uma Nota ou um objetivo não pergunta; o que leva outras coisas consigo continua a perguntar', async () => { const f = fx();
+    openSceneFicha(f.a4.id); btn('Eliminar Cena').click(); await W(20); eq(modals().length, 0, 'sem pergunta, e a ficha fecha'); ok(!state.scenes[f.a4.id]); ok(snackEl().textContent.includes('Cena «a4» eliminada') && tipFor(snackEl().querySelector('.snack-undo')));
+    snackEl().querySelector('.snack-undo').click(); await W(30); ok(state.scenes[f.a4.id] && !snackEl(), 'Anular repõe a Cena');
+    const n = newNote(); n.title = 'Lembrete'; commit(); openRefFicha(n.id); btn('Eliminar', topModal()).click(); await W(20); eq(state.refs.length, 0); ok(snackEl().textContent.includes('Nota «Lembrete» eliminada'));
+    const c0 = {id:uid('c'), name:'Vazio', scenes:[]}; state.books[0].chapters.push(c0); commit(); askDeleteChapter(c0.id); await W(20); eq(modals().length, 0, 'um Capítulo vazio sai sem pergunta'); ok(snackEl().textContent.includes('Capítulo «Vazio» eliminado'));
+    askDeleteChapter(state.books[0].chapters[0].id); await W(20); ok(topModal() && topModal().textContent.includes('e as suas 3 Cenas?'), 'com Cenas, pergunta'); await answer(false);
+    const s1 = state.books[0].chapters[0].scenes[0]; deleteScene(s1); commit(); snack('x'); const b = snackEl().querySelector('.snack-undo'); state.project.name = 'Outro'; commit(); b.click(); await W(20); eq(state.project.name, 'Outro', 'depois de outra alteração, o botão da barra já não anula'); ok(!state.scenes[s1]); });
+  await T('R08 ficha ao lado: painel à direita, quadro utilizável, Cena aberta assinalada; por omissão, a janela ao centro', async () => { const f = fx(); const ana = newCharacter('Ana'); f.a1.chars.push(ana.id); commit();
+    openSceneFicha(f.a1.id); const dk = () => topModal().querySelector('.dock-btn'); ok(dk() && tipFor(dk()), 'botão no cabeçalho da ficha'); ok(!$('.modal-back.docked') && $('main').inert, 'por omissão: janela ao centro');
+    const dbg = () => JSON.stringify({w:innerWidth, nav:navMode(), on:Dock.on, docked:!!$('.modal-back.docked'), body:document.body.className});
+    if (innerWidth < 1100){ ok(dk().hidden, 'em janelas estreitas não se oferece'); return; }
+    ok(topModal().classList.contains('ft-wide'), 'na janela, as setas ficam de fora'); ok(!dk().hidden, 'o botão está à vista ' + dbg()); dk().click(); await W(30);
+    const back = $('.modal-back.docked'); ok(back && document.body.classList.contains('dock-on'), 'a ficha passa para o painel ' + dbg()); ok(!$('main').inert && !$('#topbar').inert, 'o que está por trás fica utilizável');
+    const br = back.getBoundingClientRect(), mr = $('main').getBoundingClientRect(); ok(br.right >= innerWidth - 1 && mr.right <= br.left + 1, 'o quadro encolhe e nada fica tapado ' + JSON.stringify([br.left, br.right, mr.right, innerWidth])); ok(!topModal().classList.contains('ft-wide') && topModal().querySelector('.scn-fita .ft-arrow'), 'no painel, as setas ficam nas pontas da fita');
+    ok(sceneEl(f.a1.id).classList.contains('is-open'), 'a Cena aberta fica assinalada'); pe('pointerdown', sceneEl(f.a2.id), 5, 5); pe('pointerup', window, 5, 5); await W(10); sceneEl(f.a2.id).click(); await W(30); eq(modals().length, 1, 'abrir outra Cena substitui a do painel');
+    eq(topModal().querySelector('.title-inp').value, 'a2'); ok(sceneEl(f.a2.id).classList.contains('is-open') && !sceneEl(f.a1.id).classList.contains('is-open'), 'a marca passa para a nova Cena');
+    key('ArrowLeft'); await W(30); eq(topModal().querySelector('.title-inp').value, 'b1', '← e → continuam a percorrer'); ok(sceneEl(f.b1.id).classList.contains('is-open'), 'a marca acompanha as setas');
+    pe('pointerdown', sceneEl(f.a1.id), 5, 5); pe('pointerup', window, 5, 5); await W(10); sceneEl(f.a1.id).click(); await W(30); const chip = [...topModal().querySelectorAll('.chip.click span')].find(x => x.textContent === 'Ana'); pe('pointerdown', chip, 5, 5); chip.click(); await W(30); eq(modals().length, 2, 'a partir de dentro da ficha, abre por cima'); ok(topModal().closest('.docked'), 'a segunda ficha também fica no painel');
+    key('Escape'); await W(20); eq(modals().length, 1); eq(lsGet(LS_DOCK), '1', 'fica lembrado'); dk().click(); await W(30); ok(!$('.modal-back.docked') && !document.body.classList.contains('dock-on') && $('main').inert, 'e volta à janela'); eq(lsGet(LS_DOCK), '0'); });
+  await T('R09 listas: iniciais na cor do Arco, tira de presença, procurar, ordenar e linhas — as mesmas ferramentas em todas', async () => { const f = fx();
+    const ana = newCharacter('Ana Maria Faria'), rui = newCharacter('rui'), lug = newScenery('Farol'); f.b1.chars.push(ana.id); f.b2.pov = ana.id; f.a4.chars.push(rui.id); f.a3.sceneries.push(lug.id); commit();
+    for (const t of ['books', 'characters', 'arcs', 'sceneries', 'refs']){ setTab(t); const hd = $('#view-page .page-head'); ok(hd.querySelector('.list-q') && hd.querySelector('.list-sort') && hd.querySelectorAll('.list-lay button').length === 2, t + ': procurar, ordenar e disposição');
+      ok([hd.querySelector('.list-q'), hd.querySelector('.list-sort'), ...hd.querySelectorAll('.list-lay button')].every(x => tipFor(x)), t + ': explicadores'); }
+    setTab('characters'); const cards = () => [...document.querySelectorAll('#view-page .card')], names = () => cards().map(c => c.querySelector('h3').textContent);
+    eq(names(), ['Ana Maria Faria', 'rui']); const av = cards()[0].querySelector('.avatar'); eq(av.textContent, 'AF', 'iniciais do primeiro e do último nome'); eq(cards()[1].querySelector('.avatar').textContent, 'R');
+    ok(av.style.background && tipFor(av), 'cor do Arco em que mais aparece');
+    const pr = cards()[0].querySelector('.pres'); ok(pr && tipFor(pr).text.includes('2 de 6 Cenas'), 'presença: ' + tipFor(pr).text); eq(pr.querySelectorAll('i').length, 2, 'um bloco por Tomo'); ok(pr.querySelector('i').style.getPropertyValue('--fill').includes('linear-gradient'));
+    const sel = $('#view-page .list-sort'); sel.value = 'scenes'; sel.dispatchEvent(new Event('change')); eq(names(), ['Ana Maria Faria', 'rui']); sel.value = 'first'; sel.dispatchEvent(new Event('change')); eq(names(), ['Ana Maria Faria', 'rui'], 'pela primeira aparição');
+    const q = $('#view-page .list-q'); q.focus(); setInput(q, 'RU'); eq(names(), ['rui'], 'procurar não distingue maiúsculas'); ok(document.activeElement === q, 'o foco fica na caixa enquanto se escreve'); setInput(q, 'zz'); ok($('#view-page .empty').textContent.includes('Nada encontrado')); setInput(q, '');
+    $('#view-page .list-lay [data-lay="rows"]').click(); await W(20); ok($('#view-page .el-rows') && cards().every(c => c.classList.contains('el-row')), 'em linhas'); ok(cards()[0].querySelector('.pres') && cards()[0].querySelector('.avatar'));
+    cards()[1].click(); await W(20); eq(topModal().querySelector('input').value, 'rui', 'uma linha abre a ficha'); closeAllModals(); setTab('arcs'); ok($('#view-page .el-rows'), 'a disposição vale para todas as listas'); eq(lsGet(LS_LAYOUT), 'rows');
+    $('#view-page .list-lay [data-lay="cards"]').click(); await W(20); ok($('#view-page .grid')); eq([...document.querySelectorAll('#view-page .card .pres')].length, 2, 'Arcos com tira de presença'); });
+  await T('R10 Plano: anéis, linha do tempo das fases, arrastar um evento no calendário e criar um objetivo num dia', async () => { const f = fx(); setStage(f.a1.id, 'write', true); const g = newGoal(); g.title = 'Ver mapa'; g.due = '2030-06-10'; commit();
+    setTab('plan'); filters.planView = 'overview'; renderAll(); ok($('#view-page .rings') && $('#view-page .rings').getAttribute('aria-label').includes('Escrita 17%'), 'anéis: ' + $('#view-page .rings').getAttribute('aria-label')); eq($('#view-page .rings').querySelectorAll('circle.ring').length, 1, 'só há traço onde há progresso');
+    ok(!$('#view-page .tl'), 'sem datas, sem linha do tempo'); setPhase('write', 'start', '2030-05-01'); setPhase('write', 'end', '2030-07-31'); setPhase('review', 'start', '2030-08-01');
+    const tl = $('#view-page .tl'); ok(tl, 'linha do tempo'); eq(tl.querySelectorAll('.tl-bar').length, 1); eq(tl.querySelectorAll('.tl-tick').length, 1, 'uma fase só com início é uma marca'); ok(tl.querySelector('.tl-now') && tl.querySelector('.tl-dots .ev-dot'), 'hoje e os prazos como pontos');
+    const bar = tl.querySelector('.tl-bar'); ok(tipFor(bar).text.includes('Arraste as pontas')); const hd = bar.querySelector('.tl-h.e'), hr = hd.getBoundingClientRect(), rows = tl.querySelector('.tl-rows').getBoundingClientRect();
+    pe('pointerdown', hd, hr.left + 3, hr.top + 5); hd.dispatchEvent(new PointerEvent('pointermove', {bubbles:true, clientX:rows.right - 2, clientY:hr.top + 5, pointerId:1})); hd.dispatchEvent(new PointerEvent('pointerup', {bubbles:true, clientX:rows.right - 2, clientY:hr.top + 5, pointerId:1})); await W(20);
+    ok(phaseOf('write').end > '2030-07-31', 'arrastar a ponta muda a data: ' + phaseOf('write').end); eq(phaseOf('write').start, '2030-05-01');
+    filters.planView = 'calendar'; filters.calMonth = '2030-06'; filters.calDay = null; renderAll(); const day = iso => $('#view-page .cal-day[data-day="' + iso + '"]');
+    ok(day('2030-06-10').querySelector('.cal-ev[draggable="true"]'), 'os eventos arrastam-se'); ok(moveEvent('goal-' + g.id, '2030-06-12')); eq(goalById(g.id).due, '2030-06-12'); ok(snackEl().textContent.includes('Data alterada'));
+    ok(day('2030-06-12').querySelector('.cal-ev') && !day('2030-06-10').querySelector('.cal-ev')); setSceneDue(f.a1.id, 'write', '2030-06-02'); ok(moveEvent('scene-write-' + f.a1.id, '2030-06-03')); eq(stg(f.a1, 'write').due, '2030-06-03'); ok(moveEvent('phase-write-start', '2030-05-02')); eq(phaseOf('write').start, '2030-05-02'); ok(!moveEvent('nada', '2030-06-03'));
+    const add = day('2030-06-20').querySelector('.cal-add'); ok(add && tipFor(add)); add.click(); await W(20); const g2 = state.goals[state.goals.length - 1]; eq(g2.due, '2030-06-20', 'o «+» cria um objetivo nesse dia'); ok(topModal().textContent.includes('Objetivo de pesquisa')); closeAllModals();
+    day('2030-06-25').click(); await W(20); eq(filters.calDay, '2030-06-25', 'um dia sem eventos também se escolhe'); ok(btn('+ Objetivo de pesquisa neste dia', $('#view-page'))); });
+  await T('R11 primeiros passos: exemplo para mexer, modelos de estrutura, «+ Cena» já à vista no quadro vazio e dicas uma só vez', async () => {
+    const fs = document.querySelector('.first-scene'); ok(fs && fs.offsetParent && tipFor(fs), 'no quadro vazio, o cartão «+ Cena» já está à vista'); const hint = document.querySelector('.board-hint').getBoundingClientRect(); ok(hint.top >= fs.getBoundingClientRect().bottom - 1, 'a frase de ajuda fica por baixo');
+    fs.click(); await W(40); ok(topModal() && topModal().textContent.includes('Arco Narrativo'), 'sem Arcos Narrativos, pede primeiro o Arco'); closeAllModals(); newArc('Trama'); commit(); document.querySelector('.first-scene').click(); await W(40);
+    const ren = document.querySelector('.scene-rename'); ok(ren, 'com um Arco, cria logo e pede o título'); setInput(ren, 'Primeira'); key('Enter', {}, ren); await W(30); eq(Object.values(state.scenes).map(s => s.title), ['Primeira']); ok(!document.querySelector('.first-scene'));
+    const n0 = Projects.idx.open.length; startExample(); await W(30); eq(Projects.idx.open.length, n0 + 1, 'o exemplo é mais um projeto aberto'); eq(Object.keys(state.scenes).length, 42); ok(!tourMode && LS_KEY, 'é um projeto verdadeiro, que se guarda');
+    templateProject('heroi'); await W(30); eq(state.books[0].chapters.length, 12); eq(state.arcs.map(a => a.name), ['Jornada do herói']); eq(Object.keys(state.scenes).length, 0); ok(!Hist.undo.length, 'o modelo é o ponto de partida');
+    templateProject('linhas'); eq(state.arcs.map(a => a.name), ['Presente', 'Passado']); eq(state.books[0].chapters.length, 4); templateProject('atos'); eq(state.books[0].chapters.map(c => c.name), ['Ato I — Apresentação', 'Ato II — Confronto', 'Ato III — Resolução']);
+    templateDialog(); await W(20); eq([...topModal().querySelectorAll('.tpl-item b')].map(x => x.textContent), ['Três atos', 'Jornada do herói', 'Duas linhas temporais']); ok([...topModal().querySelectorAll('.tpl-item')].every(x => tipFor(x))); closeAllModals();
+    Coach.seen = {}; Coach.last = 0; ok(coach('teste', 'Uma dica'), 'a dica aparece'); ok(document.querySelector('.coach') && tipFor(document.querySelector('.coach-x'))); ok(!coach('teste', 'Uma dica'), 'e só uma vez'); document.querySelector('.coach-x').click(); ok(!document.querySelector('.coach'));
+    Coach.last = 0; ok(!coach('teste', 'x')); Coach.last = Infinity; });
+  await T('R12 fichas: secções que abrem e fecham, com contador; ícones nos campos da Cena; telemóvel sem transbordo com as novas barras', async () => { const f = fx();
+    state.refs.push({id:'r1', type:'note', title:'n1', text:'', links:[{kind:'scene', id:f.a1.id}], created:1}, {id:'r2', type:'note', title:'n2', text:'', links:[{kind:'scene', id:f.a1.id}], created:2}); commit(); openSceneFicha(f.a1.id);
+    const sec = t => [...topModal().querySelectorAll('.sec')].find(s => s.querySelector('.sec-title').textContent === t); eq(sec('Notas').querySelector('.sec-n').textContent, '2', 'contador'); ok(!sec('Referências').querySelector('.sec-n'), 'sem itens, sem contador');
+    const tg = sec('Notas').querySelector('.sec-tog'); ok(tipFor(tg)); tg.click(); ok(sec('Notas').querySelector('.sec-body').hidden && tg.getAttribute('aria-expanded') === 'false'); closeAllModals(); openSceneFicha(f.a2.id); ok(sec('Notas').querySelector('.sec-body').hidden, 'fica lembrado nas outras fichas');
+    sec('Notas').querySelector('.sec-tog').click(); ok(!sec('Notas').querySelector('.sec-body').hidden); eq(topModal().querySelectorAll('.field > label .f-ic').length, 7, 'ícones nos campos'); ok(!topModal().querySelector('.posbox').textContent.includes('podem partilhar'), 'Posição mais curta'); closeAllModals();
+    await phone(390, 800, async (w, d) => { await W(60); ok(d.querySelector('#boardBar') && !d.querySelector('#boardBar').hidden && d.querySelector('#filterBtn').offsetParent, 'filtros também no telemóvel'); ok(!d.querySelector('#boardBar .view-seg') && d.querySelector('.view-toggle'), 'a escolha Lista/Quadro fica onde estava');
+      ok(d.querySelector('#searchBtn').offsetParent, 'pesquisa no topo'); ok(d.documentElement.scrollWidth <= 391, 'sem transbordo no topo: ' + d.documentElement.scrollWidth); ok(d.querySelector('#zoomBox') === null || d.querySelector('#zoomBox').hidden, 'sem ampliação no telemóvel');
+      for (const t of ['books', 'characters', 'arcs', 'sceneries', 'refs']){ w.setTab(t); await W(30); ok(d.documentElement.scrollWidth <= 391 && d.querySelector('#view-page').scrollWidth <= 391, t + ' sem transbordo'); }
+      w.eval("filters.planView = 'progress'; activeTab = 'plan'; renderAll();"); await W(30); ok(d.querySelector('#view-page').scrollWidth <= 391, 'Escrita e Revisão cabem no telemóvel: ' + d.querySelector('#view-page').scrollWidth);
+      w.eval("openSearch()"); await W(30); ok(d.querySelector('.find-modal').getBoundingClientRect().width <= 390); }); });
+  /* ---- segunda auditoria revista (14, 15, 17, 18, 20, 21, 23) e pedidos de 2026-11-24 ---- */
+  await T('S01 Localizações: o nome novo em toda a interface e nos três dicionários', async () => { const f = fx(); const lug = newScenery(); eq(lug.name, 'Nova Localização'); commit();
+    eq(TABS.find(t => t[0] === 'sceneries')[1], 'Localizações'); setTab('sceneries'); eq($('#view-page h1').textContent, 'Localizações'); ok(btn('+ Nova Localização', $('#view-page')));
+    openSceneryFicha(lug.id); ok(topModal().textContent.includes('Ficha da Localização') && btn('Eliminar Localização')); closeAllModals(); openSceneFicha(f.a1.id); ok([...topModal().querySelectorAll('.field > label')].some(l => l.textContent === 'Localizações')); closeAllModals();
+    for (const l of ['en', 'es', 'fr']){ const src = await (await fetch('js/lang-' + l + '.js')).text(); ok(!/Cenário/.test(src), l + ': ainda há chaves com «Cenário»'); ok(!/Scenery|Sceneries|Escenario|Décor/.test(src), l + ': a tradução ainda usa o nome antigo'); ok(/Location|Lugar|Lieu/.test(src)); ok(!/Localizaci/.test(src), l + ': em espanhol é «Lugar»'); }
+    for (const f2 of ['js/tips.js', 'js/tour.js', 'js/fichas.js', 'js/tabs.js']){ const src = await (await fetch(f2)).text(); ok(!/Cenário/.test(src), f2 + ': ainda diz «Cenário»'); } });
+  await T('S02 Tomos e Capítulos: os Capítulos numa secção da mesma página, com os mesmos filtros e a mesma procura', async () => { const f = fx(); const ana = newCharacter('Ana'); f.a3.chars.push(ana.id); commit();
+    eq(TABS.find(t => t[0] === 'books')[1], 'Tomos e Capítulos'); setTab('books'); eq($('#view-page h1').textContent, 'Tomos e Capítulos'); eq($('#rail .nav-item[data-tab="books"] .nav-label').textContent, 'Tomos', 'na barra, o nome curto');
+    eq([...document.querySelectorAll('#view-page .list-subt')].map(x => x.firstChild.textContent), ['Tomos', 'Capítulos']); const ch = () => [...document.querySelectorAll('#view-page .ch-card h3')].map(x => x.textContent);
+    eq(ch(), ['C1', 'C2', 'C3']); ok(document.querySelector('#view-page .ch-card .pres'), 'tira de presença do Capítulo'); ok(tipFor(document.querySelector('#view-page .ch-card')));
+    ok(document.querySelector('#view-page .ch-card').textContent.includes('Tomo 1 · Capítulo 1') && document.querySelector('#view-page .ch-card').textContent.includes('3 Cenas'));
+    filters.booksChar = ana.id; renderAll(); eq(ch(), ['C2'], 'o filtro por Personagem vale para os Capítulos'); filters.booksChar = null; renderAll();
+    setInput($('#view-page .list-q'), 'c3'); eq(ch(), ['C3'], 'a procura também'); eq(document.querySelectorAll('#view-page .card:not(.ch-card)').length, 0); setInput($('#view-page .list-q'), '');
+    ok(btn('+ Novo Capítulo', $('#view-page')) && tipFor(btn('+ Novo Capítulo', $('#view-page')))); document.querySelectorAll('#view-page .ch-card')[1].click(); await W(60); eq(activeTab, 'board', 'clicar num Capítulo leva-o ao quadro'); });
+  await T('S03 importar Personagens, Localizações e Referências de outro projeto aberto', async () => { const f = fx();
+    setTab('characters'); const ib = $('#view-page .imp-btn'); ok(ib && tipFor(ib)); ib.click(); await W(20); eq(modals().length, 0, 'sem outro projeto aberto, só avisa'); ok([...document.querySelectorAll('.toast')].some(t => t.textContent.includes('outro projeto aberto')));
+    const other = blankProject(); other.project.name = 'Fonte'; other.characters = [{id:'c1', name:'Ana', gender:'F', age:'30', description:'Alta'}, {id:'c2', name:'Rui', gender:'M', age:'', description:''}];
+    other.sceneries = [{id:'l1', name:'Farol', chars:['c1', 'c2']}]; other.refs = [{id:'r1', type:'note', title:'Ideia', text:'texto', links:[{kind:'character', id:'c1'}, {kind:'scenery', id:'l1'}, {kind:'book', id:other.books[0].id}], created:1}, {id:'r2', type:'document', title:'Mapa', fileName:'mapa.txt', size:4, mime:'text/plain', links:[], created:2}];
+    await idb.put('r2', new Blob(['mapa'], {type:'text/plain'})); const mine = projActive(); const oid = projAdd(sanitize(other)); projSwitch(mine); await W(30); eq(projActive(), mine); eq(state.characters.length, 0);
+    const rui = newCharacter('Rui'); commit(); setTab('characters'); $('#view-page .imp-btn').click(); await W(30); const m = topModal(); ok(m.textContent.includes('Fonte'), 'diz de que projeto');
+    const items = k => [...m.querySelectorAll('.imp-group[data-kind="' + k + '"] .imp-item')]; eq(items('characters').map(x => [x.querySelector('.imp-name').textContent, x.querySelector('input').checked, x.classList.contains('dup')]), [['Ana', true, false], ['Rui', false, true]], 'aberto a partir das Personagens: vêm escolhidas as que ainda não existem');
+    eq(items('sceneries').map(x => x.querySelector('input').checked), [false]); ok(items('characters').every(x => tipFor(x)) && tipFor(m.querySelector('.imp-all')));
+    items('sceneries')[0].querySelector('input').click(); m.querySelector('.imp-group[data-kind="refs"] .imp-all').click(); await W(20); eq(topModal().querySelector('.imp-go').textContent, 'Importar 4 elementos');
+    topModal().querySelector('.imp-go').click(); await W(120); eq(modals().length, 0); eq(state.characters.map(c => c.name).sort(), ['Ana', 'Rui']); const ana = state.characters.find(c => c.name === 'Ana'); eq([ana.gender, ana.age, ana.description], ['F', '30', 'Alta']); ok(ana.id !== 'c1', 'identificador novo');
+    const far = state.sceneries.find(x => x.name === 'Farol'); eq(far.chars.slice().sort(), [ana.id, rui.id].sort(), 'a Localização liga-se à Personagem importada e à que já cá estava com o mesmo nome');
+    const idea = state.refs.find(r => r.title === 'Ideia'), map = state.refs.find(r => r.title === 'Mapa'); eq(idea.links, [{kind:'character', id:ana.id}, {kind:'scenery', id:far.id}], 'as ligações a Tomos do outro projeto não vêm');
+    const blob = await idb.get(map.id); ok(blob && (await blob.text()) === 'mapa', 'o ficheiro vem com a Referência'); ok(map.id !== 'r2');
+    ok([...document.querySelectorAll('.toast')].some(t => /Importado: 1 Personagem, 1 Localização, 2 Referências/.test(t.textContent))); undo(); eq(state.sceneries.length, 0, 'um só Anular desfaz a importação');
+    const src = JSON.parse(lsGet(projKey(oid))); eq(src.characters.length, 2, 'o outro projeto não muda'); for (const t of ['sceneries', 'refs']){ setTab(t); ok($('#view-page .imp-btn'), t + ' também tem Importar'); } });
+  await T('S04 Materiais de Apoio: nome original entre parênteses; F1 procura neles; a ficha pode ficar ao lado', async () => { fx();
+    const e = supportIndex.get('Analepse'); eq(e.it.o, 'Flashback'); eq(supportIndex.get('Jornada do Herói').it.o, 'The Hero’s Journey'); eq(supportIndex.get('Fluxo de consciência').it.o, 'Stream of consciousness'); ok(!supportIndex.get('Ironia').it.o, 'só onde o nome vem de uma expressão estrangeira');
+    for (const n in SUPPORT_ORIGINAL.pt) ok(supportIndex.has(n), 'ficha em falta: ' + n);
+    openSupportFicha('Jornada do Herói'); eq(topModal().querySelector('h2').textContent, 'Jornada do Herói (The Hero’s Journey)'); ok(topModal().querySelector('h2 .sup-orig')); closeAllModals();
+    setTab('support'); filters.supSec = 'metodos'; renderAll(); ok([...document.querySelectorAll('#view-page .card h3')].some(x => x.textContent === 'Método do Floco de Neve (Snowflake Method)'));
+    setInput($('#view-page .sup-search'), 'snowflake'); eq(document.querySelector('#view-page .card h3').textContent, 'Método do Floco de Neve (Snowflake Method)', 'procura-se também pelo nome original'); setTab('board');
+    key('F1'); await W(20); const inp = topModal().querySelector('.find-inp'); ok(inp && inp.placeholder.includes('Materiais de Apoio'), 'F1 abre a pesquisa nos Materiais de Apoio'); ok(topModal().querySelectorAll('.find-item').length >= 10, 'sem texto, as secções');
+    setInput(inp, 'hero journey'); eq(topModal().querySelector('.find-item .find-l').textContent, 'Jornada do Herói (The Hero’s Journey)'); eq([...topModal().querySelectorAll('.find-group')].map(x => x.textContent), ['Materiais de Apoio']);
+    key('Enter', {}, inp); await W(30); eq(topModal().querySelector('h2').textContent, 'Jornada do Herói (The Hero’s Journey)'); ok(topModal().querySelector('.dock-btn'), 'a ficha de apoio também pode ficar ao lado'); closeAllModals(); });
+  await T('S05 Plano: cartões «a seguir»; Agenda no calendário; prazo em atraso assinalado na Cena', async () => { const f = fx(); setStage(f.a1.id, 'write', true); const g = newGoal(); g.title = 'Ler o diário'; g.due = '2030-01-05'; setSceneDue(f.b1.id, 'write', '2020-01-01'); commit();
+    setTab('plan'); filters.planView = 'overview'; renderAll(); const nx = k => $('#view-page .next-card[data-next="' + k + '"]'); ok(nx('write') && nx('review') && nx('due') && nx('goal'), 'quatro cartões'); ok([nx('write'), nx('due')].every(x => tipFor(x)));
+    eq(nx('write').querySelector('b').textContent, 'b1'); eq(nx('review').querySelector('b').textContent, 'a1'); ok(nx('due').classList.contains('late') && nx('due').textContent.includes('Prazo em atraso')); eq(nx('goal').querySelector('b').textContent, 'Ler o diário');
+    nx('write').click(); await W(20); eq(topModal().querySelector('.title-inp').value, 'b1', 'o cartão abre a Cena'); closeAllModals(); setTab('board');
+    const lm = sceneEl(f.b1.id).querySelector('.late-mark'); ok(lm && tipFor(lm).text.includes('Prazo de escrita em atraso'), 'marca no cartão'); ok(!sceneEl(f.a1.id).querySelector('.late-mark')); hover(sceneEl(f.b1.id).querySelector('.scene-title')); ok(tipFor(sceneEl(f.b1.id).querySelector('.scene-title')).text.includes('em atraso'));
+    setStage(f.b1.id, 'write', true); ok(!sceneEl(f.b1.id).querySelector('.late-mark'), 'escrita a Cena, a marca sai');
+    setTab('plan'); filters.planView = 'calendar'; filters.calMonth = '2030-01'; filters.calMode = null; renderAll(); ok($('#view-page .cal-grid') && !$('#view-page .agenda'), 'no PC, o mês por omissão'); const seg = $('#view-page .cal-mode'); ok(seg && [...seg.querySelectorAll('button')].every(b => tipFor(b)));
+    seg.querySelector('[data-mode="agenda"]').click(); await W(20); ok($('#view-page .agenda') && !$('#view-page .cal-grid')); eq([...document.querySelectorAll('#view-page .ag-day')].map(d => d.dataset.day), ['2030-01-05']); ok($('#view-page .ag-day').textContent.includes('Ler o diário'));
+    await phone(390, 800, async (w, d) => { w.eval("filters.planView = 'calendar'; filters.calMode = null; activeTab = 'plan'; renderAll();"); await W(40); ok(d.querySelector('#view-page .agenda') && !d.querySelector('#view-page .cal-grid'), 'no telemóvel, a Agenda por omissão'); ok(d.querySelector('#view-page').scrollWidth <= 391); }); });
+  await T('S06 fichas em duas colunas na janela larga (não no painel nem em janelas estreitas); Início com «Continuar» e a silhueta', async () => { const f = fx(); openSceneFicha(f.a1.id); const box = topModal(), cols = box.querySelector('.f-cols');
+    ok(cols && box.classList.contains('two-col'), 'campos e secções em dois grupos'); eq(cols.children.length, 2); ok(cols.children[0].querySelector('.title-inp') && !cols.children[0].querySelector('.sec') && cols.children[1].querySelector('.sec'), 'campos à esquerda, secções à direita');
+    ok(box.querySelector(':scope > .ficha > .modal-foot'), 'os botões ficam por baixo das duas'); const two = getComputedStyle(cols).display === 'grid'; eq(two, innerWidth >= 1180, 'duas colunas só a partir de 1180 px');
+    if (two){ const a = cols.children[0].getBoundingClientRect(), b = cols.children[1].getBoundingClientRect(); ok(b.left >= a.right && Math.abs(a.top - b.top) < 2, 'lado a lado'); ok(box.getBoundingClientRect().width > 900); ok(box.classList.contains('ft-wide'), 'as setas continuam de fora'); }
+    box.querySelector('.steps3 button[data-st="1"]').click(); await W(20); ok(topModal().querySelector('.f-cols'), 'depois de redesenhar, continua em colunas'); closeAllModals();
+    for (const open of [() => openBookFicha(f.B1.id), () => openArcFicha(f.A.id)]){ open(); ok(topModal().querySelector('.f-cols'), 'as outras fichas também'); closeAllModals(); }
+    await phone(800, 900, async (w, d) => { w.eval("closeAllModals(); openSceneFicha(Object.keys(state.scenes)[0])"); await W(60); const c = d.querySelector('.f-cols'); ok(c && w.getComputedStyle(c).display !== 'grid', 'numa janela estreita, uma coluna'); ok(d.querySelector('.modal').getBoundingClientRect().width <= 800); });
+    flushSave(); const th = projThumb(projActive()); eq(th.querySelectorAll('svg path:not(.lt-book)').length, 2, 'silhueta: uma linha por Arco Narrativo'); eq(th.querySelectorAll('circle').length, 6, 'e um ponto por Cena'); eq(th.querySelectorAll('.lt-book').length, 1, 'com a separação dos Tomos'); ok(!th.textContent, 'sem texto'); });
+  /* ---- Localizações principais e secundárias; a visita com um livro de dimensão real e «Explorar o projeto» ---- */
+  await T('T01 Localizações principais e secundárias: marcar, filtrar, estrela nas fichas e sugestão quando é recorrente', async () => { const f = fx(); const casa = newScenery('Casa'), cafe = newScenery('Café'); f.a1.sceneries.push(casa.id); f.a2.sceneries.push(casa.id); f.a1.sceneries.push(cafe.id); commit();
+    ok(!locSuggest(casa), 'duas Cenas ainda não chegam'); setTab('sceneries'); ok(!$('#view-page .loc-sug')); eq([...document.querySelectorAll('#view-page .card .badge')].map(b => b.textContent), ['Localização Secundária', 'Localização Secundária']);
+    openSceneFicha(f.a3.id); btn('+ Associar Localização').click(); await W(20); await pickAC(topModal().querySelector('input'), 'Cas', 'Casa'); await W(30); const nd = document.querySelector('.toast.loc-nudge'); ok(nd && nd.textContent.includes('«Casa» já aparece em 3 Cenas'), 'ao associar à terceira Cena, sugere logo'); ok([...nd.querySelectorAll('button')].every(b => tipFor(b)));
+    nd.remove(); closeAllModals(); ok(locSuggest(casa)); setTab('sceneries'); const sg = $('#view-page .loc-sug'); ok(sg && sg.dataset.loc === casa.id && [...sg.querySelectorAll('.btn')].every(b => tipFor(b)), 'sugestão por cima da lista'); ok([...document.querySelectorAll('#view-page .card .badge')].some(b => b.textContent === 'Sugestão: principal'));
+    openSceneryFicha(casa.id); ok(topModal().querySelector('.loc-sug'), 'e na ficha'); const tg = () => topModal().querySelector('.main-tog'); eq(tg().textContent.replace('☆', ''), 'Localização Secundária'); ok(topModal().textContent.includes('Aparece em 3 Cenas.'));
+    topModal().querySelector('.loc-sug [data-sug="yes"]').click(); await W(20); ok(casa.main === true && !topModal().querySelector('.loc-sug')); eq(tg().getAttribute('aria-pressed'), 'true'); eq(tg().textContent.replace('★', ''), 'Localização Principal'); closeAllModals();
+    openSceneFicha(f.a1.id); const chips = [...topModal().querySelectorAll('.field')].find(x => x.querySelector('label').textContent === 'Localizações').querySelectorAll('.chip.click'); ok(chips[0].querySelector('.loc-star') && !chips[1].querySelector('.loc-star'), 'estrela na Localização Principal'); closeAllModals();
+    setTab('sceneries'); const names = () => [...document.querySelectorAll('#view-page .card h3')].map(x => x.textContent), seg = k => $('#view-page .loc-seg [data-role="' + k + '"]'); ok([seg('all'), seg('main'), seg('side')].every(b => tipFor(b)));
+    seg('main').click(); eq(names(), ['Casa']); seg('side').click(); eq(names(), ['Café']); seg('all').click(); eq(names(), ['Café', 'Casa']);
+    openSceneryFicha(casa.id); tg().click(); await W(20); ok(!casa.main && casa.noMain === true && !topModal().querySelector('.loc-sug'), 'desmarcada à mão, não volta a sugerir'); closeAllModals();
+    const g = newScenery('Gare'); [f.a1, f.a2, f.a3].forEach(s => s.sceneries.push(g.id)); commit(); setTab('sceneries'); $('#view-page .loc-sug [data-sug="no"]').click(); await W(20); ok(g.noMain === true && !$('#view-page .loc-sug'), '«Não, é secundária» encerra o assunto');
+    const d = sanitize(JSON.parse(JSON.stringify(state))); eq(d.sceneries.map(x => [x.name, !!x.main, !!x.noMain]), [['Casa', false, true], ['Café', false, false], ['Gare', false, true]], 'guarda-se com o projeto'); ok(!('main' in d.sceneries[1]), 'sem nada a mais onde não há marca'); });
+  await T('T02 projeto da visita: um livro com dimensão real — Tomos, Capítulos, Cenas, Personagens e Localizações', async () => { const d = sanitize(demoProject());
+    ok(d.books.length >= 1 && d.books.length <= 3, 'Tomos'); const chs = d.books.flatMap(b => b.chapters); ok(chs.length >= 12 && chs.length <= 24, 'Capítulos: ' + chs.length); ok(chs.every(c => c.scenes.length >= 3 && c.scenes.length <= 5), 'de 3 a 5 Cenas por Capítulo');
+    eq(Object.keys(d.scenes).length, chs.reduce((n, c) => n + c.scenes.length, 0), 'todas as Cenas estão num Capítulo'); ok(d.characters.length >= 20 && d.characters.length <= 30, 'Personagens: ' + d.characters.length);
+    const mains = new Set(d.books.flatMap(b => b.mainChars)); ok(mains.size >= 2 && mains.size <= 3, 'Personagens Principais: ' + mains.size); ok(d.sceneries.length >= 15 && d.sceneries.length <= 20, 'Localizações: ' + d.sceneries.length);
+    const lm = d.sceneries.filter(x => x.main).length; ok(lm >= 2 && lm <= 3, 'Localizações Principais: ' + lm); const used = id => Object.values(d.scenes).filter(s => s.sceneries.includes(id)).length;
+    ok(d.sceneries.filter(x => x.main).every(x => used(x.id) >= 5), 'as principais são as mais usadas'); ok(d.sceneries.filter(x => !x.main && used(x.id) <= 2).length >= 8, 'a maior parte das secundárias aparece uma ou duas vezes');
+    ok(Object.values(d.scenes).every(s => d.arcs.some(a => a.id === s.arcId) && s.chars.every(c => d.characters.some(x => x.id === c)) && s.sceneries.every(l => d.sceneries.some(x => x.id === l))), 'sem ligações partidas');
+    state = d; commit(); settle(); layoutInvariants(); ok(state.sceneries.some(locSuggest), 'o exemplo mostra uma sugestão de Localização Principal'); eq(frontiers().length, 2, 'com escrita e revisão em curso');
+    for (const k of ['basic', 'deep']){ startTour(k); for (let i = 0; i < Tour.steps.length; i++){ Tour.i = i; showTourStep(); const st = Tour.steps[i]; if (st.sel && !/tip|ghost|ctx-menu|createFab|narrList|dualBtn/.test(st.sel)) ok(document.querySelector(st.sel), k + ': o passo «' + st.title + '» não encontra ' + st.sel); } endTour(); }
+    const tt = TOUR_STEPS.map(s => s.title); for (const t of ['Estado de cada Cena', 'Filtros e vistas', 'Pesquisa e atalhos', 'Separador Tomos e Capítulos']) ok(tt.includes(t), 'falta na visita: ' + t);
+    const dt = TOUR_DEEP.map(s => s.title); for (const t of ['Ficha ao lado e em duas colunas', 'Localizações principais e secundárias', 'Importar de outro projeto']) ok(dt.includes(t), 'falta na visita detalhada: ' + t); });
+  await T('T03 visita: «Explorar o projeto» abre o livro de demonstração como projeto verdadeiro e deixa a visita em pausa', async () => { const f = fx(); flushSave(); const mine = projActive(), n0 = Projects.idx.open.length; Tour.exploreId = null;
+    startTour(); Tour.i = 6; showTourStep(); const total = Tour.steps.length; const ex = $('#tourPop .tour-explore'); ok(ex, 'botão em cada passo'); ex.click(); await W(40);
+    ok(!Tour.active && !tourMode, 'a visita sai da frente'); eq(Projects.idx.open.length, n0 + 1); ok(projActive() !== mine && Object.keys(state.scenes).length === 42, 'o livro de demonstração é agora um projeto aberto'); ok(LS_KEY && $('#tourPop').hidden);
+    const pill = $('#tourResume'); ok(pill && pill.textContent.includes('passo 7 de ' + total), 'a visita fica à espera: ' + pill.textContent); ok([...pill.querySelectorAll('button')].every(b => tipFor(b)));
+    const s1 = sceneEl('s1'); s1.querySelector('.scene-st').click(); await W(20); ok(!isDone(state.scenes.s1, 'write'), 'o estado da Cena muda'); const b0 = state.books.length; addBook(); eq(state.books.length, b0 + 1, 'pode mexer-se em tudo'); const exId = projActive();
+    btn('Continuar a visita', pill).click(); await W(40); ok(Tour.active && Tour.i === 6, 'retoma no mesmo passo'); ok(!$('#tourResume')); endTour(); await W(20); eq(projActive(), mine, 'no fim, volta ao seu projeto'); eq(state.scenes[f.a1.id].title, 'a1');
+    ok(Projects.idx.open.includes(exId), 'o exemplo continua aberto'); startTour(); $('#tourPop .tour-explore').click(); await W(40); eq(projActive(), exId, 'explorar outra vez volta ao mesmo exemplo, sem criar outro'); eq(Projects.idx.open.length, n0 + 1); eq(state.books.length, b0 + 1);
+    btn('Terminar visita', $('#tourResume')).click(); ok(!$('#tourResume') && !Tour.active); Tour.exploreId = null; });
+  await T('T04 contraste dos elementos novos, tal como aparecem, em paletas claras e escuras', async () => { fx(); setTab('board');
+    const cv = document.createElement('canvas'); cv.width = cv.height = 1; const g = cv.getContext('2d', {willReadFrequently:true});
+    const paint = (base, css) => { g.fillStyle = 'rgb(' + base.map(x => Math.round(x * 255)).join(',') + ')'; g.fillRect(0, 0, 1, 1); g.fillStyle = '#000'; g.fillStyle = css; g.fillRect(0, 0, 1, 1); const d = g.getImageData(0, 0, 1, 1).data; return [d[0] / 255, d[1] / 255, d[2] / 255]; };
+    const bgOf = el => { const chain = []; for (let x = el; x; x = x.parentElement) chain.unshift(x); let c = paint([1, 1, 1], getComputedStyle(document.body).backgroundColor);
+      for (const x of chain){ const b = getComputedStyle(x).backgroundColor; if (b && b !== 'rgba(0, 0, 0, 0)' && b !== 'transparent') c = paint(c, b); } return c; };
+    const box = h('div', {id:'qaContrast', style:{position:'fixed', left:'0', top:'0', width:'900px', zIndex:'9999', background:'var(--bg)'}}); document.body.append(box);
+    const card = (...k) => h('div', {class:'card static'}, ...k), modal = (...k) => h('div', {class:'modal still'}, ...k);
+    const S = [
+      ['«a seguir»: título', () => h('button', {class:'next-card'}, h('span', {class:'kicker'}, 'K'), h('b', null, 'Título'), h('span', {class:'muted small'}, 'sub')), '.next-card b'],
+      ['«a seguir»: etiqueta', null, '.next-card .kicker'], ['«a seguir»: lugar', null, '.next-card .muted'],
+      ['«a seguir» em atraso', () => h('button', {class:'next-card late'}, h('span', {class:'kicker'}, 'K'), h('b', null, 'T')), '.next-card.late .kicker'],
+      ['etiqueta de filtro', () => h('span', {class:'chip f-chip'}, 'Personagem: Ana'), '.f-chip'],
+      ['sugestão de Localização', () => h('div', {class:'loc-sug'}, h('span', {class:'loc-sug-t'}, 'Texto')), '.loc-sug-t'],
+      ['prazo em atraso', () => card(h('button', {class:'due-chip late'}, '12 mar')), '.due-chip.late'],
+      ['prazo', () => card(h('button', {class:'due-chip'}, '12 mar')), '.due-chip:not(.late)'],
+      ['«+ prazo»', () => card(h('button', {class:'due-add', style:{opacity:'1'}}, '+ prazo')), '.due-add'],
+      ['etiqueta «Sugestão»', () => card(h('span', {class:'badge sug'}, 'Sugestão')), '.badge.sug'],
+      ['etiqueta principal', () => card(h('span', {class:'badge main'}, 'Principal')), '.badge.main'],
+      ['vista escolhida', () => h('div', {class:'view-seg'}, h('button', {'aria-pressed':'true'}, 'Quadro'), h('button', {'aria-pressed':'false', class:'vs-off'}, 'Lista')), '.view-seg [aria-pressed="true"]'],
+      ['vista por escolher', null, '.view-seg .vs-off'],
+      ['estado escolhido', () => modal(h('div', {class:'steps3'}, h('button', {'aria-pressed':'true'}, 'Escrita'), h('button', {'aria-pressed':'false', class:'s3-off'}, 'Revista'))), '.steps3 [aria-pressed="true"]'],
+      ['estado por escolher', null, '.steps3 .s3-off'],
+      ['botão Filtrar ativo', () => h('button', {class:'bar-btn on'}, 'Filtrar'), '.bar-btn.on'],
+      ['botão Filtrar', () => h('button', {class:'bar-btn'}, 'Filtrar'), '.bar-btn:not(.on)'],
+      ['pesquisa no topo', () => h('button', {class:'search-pill', style:{background:'var(--surface2)'}}, h('span', {class:'sp-l'}, 'Pesquisar')), '.search-pill .sp-l'],
+      ['resultado escolhido', () => modal(h('button', {class:'find-item active'}, h('span', {class:'find-l'}, 'Cena'), h('span', {class:'find-s muted small'}, 'sub'))), '.find-item.active .find-l'],
+      ['resultado: pormenor', null, '.find-item.active .find-s'],
+      ['dica', () => h('div', {class:'coach'}, h('span', {class:'coach-t'}, 'Dica')), '.coach-t'],
+      ['legenda da fita', () => modal(h('div', {class:'scn-fita'}, h('div', {class:'ft-trk narr'}, h('div', {class:'ft-cap'}, 'Ordem Narrativa')))), '.ft-cap'],
+      ['nome original', () => modal(h('h2', null, 'Nome ', h('span', {class:'sup-orig'}, '(Original)'))), '.sup-orig'],
+      ['número do Capítulo', () => card(h('span', {class:'el-lead'}, '3')), '.el-lead'],
+      ['hoje na Agenda', () => card(h('div', {class:'ag-day today'}, h('div', {class:'ag-date'}, h('b', null, '24'), h('span', null, 'seg')))), '.ag-day.today b'],
+      ['dia na Agenda', null, '.ag-day.today .ag-date span'],
+      ['hoje no calendário', () => h('div', {class:'cal-day today'}, h('div', {class:'cal-top'}, h('span', {class:'cal-num'}, '24'))), '.cal-day.today .cal-num'],
+      ['visita em pausa', () => h('div', {class:'tr-qa', style:{background:'var(--surface2)'}}, h('span', {class:'tr-t'}, 'Visita em pausa')), '.tr-qa .tr-t'],
+      ['já existe (importar)', () => modal(h('label', {class:'imp-item dup'}, h('span', {class:'imp-name'}, 'Ana'))), '.imp-item.dup .imp-name'],
+      ['Arco recolhido', () => h('div', {id:'gutter', style:{position:'relative', width:'200px'}}, h('div', {class:'lane-label off', style:{position:'relative', height:'30px'}}, h('span', {class:'lane-name'}, 'Arco'))), '.lane-label.off .lane-name'],
+      ['marca de atraso', () => h('span', {class:'late-mark'}, h('span', {class:'qa-t'}, '!')), '.late-mark .qa-t'],
+      ['barra Anular', () => h('div', {class:'toast snack', style:{position:'static'}}, h('span', {class:'snack-t'}, 'Feito'), h('button', {class:'snack-undo'}, 'Anular')), '.snack-undo']];
+    let last = null; for (const s of S){ if (s[1]){ last = s[1](); box.append(last); } }
+    const bad = [], seen = new Set(); let n = 0;
+    for (const mode of ['dark', 'light']) for (let hue = 0; hue < 360; hue += 45){ lsSet(LS_THEME, mode); state.project.palette = {h:hue, mode}; applyPalette(); await W(0);
+      for (const [name, , sel] of S){ const el = box.querySelector(sel); if (!el){ bad.push('em falta: ' + name); continue; } n++;
+        const fg = paint(bgOf(el), getComputedStyle(el).color), x = contrast(fg, bgOf(el)), min = 4.5;
+        if (x < min && !seen.has(name)){ seen.add(name); bad.push(name + ' (' + mode + ' ' + hue + '°): ' + x.toFixed(2)); } } }
+    box.remove(); lsSet(LS_THEME, 'dark'); state.project.palette = {h:220, mode:'dark'}; applyPalette(); ok(n > 500, 'medições: ' + n); eq(bad, []); });
+  await T('T05 guardas: segundo ecrã, visita e escrita — o painel, os atalhos e as dicas não aparecem onde não devem', async () => { const f = fx();
+    Dual.role = 'second'; try { ok(!dockable(), 'no segundo ecrã não há ficha ao lado'); key('/'); key('?'); key('n'); eq(modals().length, 0, 'no segundo ecrã, as teclas não abrem nada'); } finally { Dual.role = 'main'; }
+    startTour(); key('/'); key('F1'); key('3'); ok(!document.querySelector('.find-modal') && activeTab === 'board', 'durante a visita, os atalhos estão desligados'); ok(!$('#boardBar').hidden, 'a barra do quadro mostra-se, para ser explicada'); ok(!dockable()); endTour();
+    openSceneFicha(f.a1.id); const ti = topModal().querySelector('.title-inp'); key('2', {}, ti); key('/', {}, ti); eq(activeTab, 'board'); ok(!document.querySelector('.find-modal'), 'a escrever num campo, as teclas são texto'); key('F1', {}, ti); ok(document.querySelector('.find-modal'), 'F1 funciona mesmo a escrever'); closeAllModals();
+    setTipsOn(false); Coach.seen = {}; Coach.last = 0; coachCheck(); ok(!document.querySelector('.coach'), 'quem desligou os explicadores não recebe dicas'); setTipsOn(true); Coach.last = Infinity;
+    for (let i = 0; i < 3; i++) snack('x' + i); eq(document.querySelectorAll('.toast.snack').length, 1, 'uma barra de cada vez'); histInit(); snack('sem histórico'); ok(!snackEl().querySelector('.snack-undo'), 'sem nada para anular, não oferece Anular'); });
+  await T('T06 ida e volta em ficheiro e normalização: Localizações principais, estado, prazos e fases não se perdem; nada a mais é guardado', async () => { const f = fx();
+    const l1 = newScenery('Casa'), l2 = newScenery('Café'); setLocMain(l1, true); l2.noMain = true; f.a1.sceneries.push(l1.id); setStage(f.a1.id, 'write', true); setSceneDue(f.a2.id, 'review', '2031-01-02'); setPhase('write', 'start', '2031-01-01'); commit();
+    let blob = null; const oc = URL.createObjectURL, ac = HTMLAnchorElement.prototype.click; URL.createObjectURL = b => { blob = b; return 'blob:qa'; }; HTMLAnchorElement.prototype.click = function(){};
+    try { await exportProject(); } finally { URL.createObjectURL = oc; HTMLAnchorElement.prototype.click = ac; }
+    const text = await blob.text(), d = sanitize(JSON.parse(text).data || JSON.parse(text)); const L = id => d.sceneries.find(x => x.id === id);
+    eq([L(l1.id).main, L(l1.id).noMain, L(l2.id).main, L(l2.id).noMain], [true, undefined, undefined, true]); ok(isDone(d.scenes[f.a1.id], 'write'));
+    eq(d.scenes[f.a2.id].prog.review.due, '2031-01-02'); eq(d.plan.write.start, '2031-01-01'); ok(!/"(hidden|f|zoom|dens|calMode|scnRole|planView)":/.test(text), 'filtros, vistas e ampliação não vão para o ficheiro');
+    eq(JSON.stringify(sanitize(JSON.parse(JSON.stringify(state)))), JSON.stringify(state), 'normalizar o que se cria durante o uso não muda nada (condição da sincronização)');
+    setLocMain(l2, true); eq([l2.main, l2.noMain], [true, undefined], 'marcar como principal limpa o «não sugerir»'); });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };

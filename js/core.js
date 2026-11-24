@@ -30,7 +30,8 @@ function sanitize(d){
   d.arcs.forEach(a => { a.id = S(a.id); a.parentId = S(a.parentId); a.forkSceneId = S(a.forkSceneId); a.hue = hue(a.hue); a.sat = ARC_SATS.includes(Number(a.sat)) ? Number(a.sat) : 72; a.name = name(a.name, _('Arco Narrativo')); a.description = text(a.description); });
   const charIds = new Set(d.characters.map(c => c.id)), placed = new Set();
   const uniq = (l, ok) => [...new Set((Array.isArray(l) ? l : []).map(S))].filter(x => ok.has(x));
-  d.sceneries.forEach(x => { x.id = S(x.id); x.name = name(x.name, _('Cenário')); x.chars = uniq(x.chars, charIds); });
+  d.sceneries.forEach(x => { x.id = S(x.id); x.name = name(x.name, _('Localização')); x.chars = uniq(x.chars, charIds);
+    if (x.main === true) x.main = true; else delete x.main; if (x.noMain === true && !x.main) x.noMain = true; else delete x.noMain; }); // principal / secundária, e «não sugerir»
   const scnIds = new Set(d.sceneries.map(x => x.id));
   d.books.forEach(b => { b.id = S(b.id); b.name = name(b.name, _('Tomo')); b.narrator = text(b.narrator); b.color = bookColorOk(b.color);
     b.mainChars = (b.mainChars || []).map(S).filter(c => charIds.has(c)); b.chapters = objs(b.chapters);
@@ -298,12 +299,17 @@ function charBooks(cid){ return state.books.filter(b => bookScenes(b).some(s => 
 /* Sceneries: associam-se a Scenes (lista guardada na Scene) e a Characters (lista guardada no Scenery) */
 function sceneryScenes(id){ return narrOrder().map(sid => state.scenes[sid]).filter(s => s && s.sceneries.includes(id)); }
 const charSceneries = cid => state.sceneries.filter(x => x.chars.includes(cid));
-function newScenery(name){ const x = { id:uid('sc'), name:name || _('Novo Cenário'), chars:[] }; state.sceneries.push(x); return x; }
+function newScenery(name){ const x = { id:uid('sc'), name:name || _('Nova Localização'), chars:[] }; state.sceneries.push(x); return x; }
 function deleteScenery(id){
   Object.values(state.scenes).forEach(s => s.sceneries = s.sceneries.filter(x => x !== id));
   state.sceneries = state.sceneries.filter(x => x.id !== id); unlinkRefs('scenery', id);
 }
 
+/* Localização Principal ou Secundária (a casa da protagonista, o colégio onde decorre a ação… ou um sítio onde se passa uma vez).
+   Uma Localização por marcar que já aparece em LOC_MAIN_MIN Cenas ou mais é sugerida como principal — uma vez: «não» fica lembrado. */
+const LOC_MAIN_MIN = 3;
+const locSuggest = x => !x.main && !x.noMain && sceneryScenes(x.id).length >= LOC_MAIN_MIN;
+function setLocMain(x, on){ if (on){ x.main = true; delete x.noMain; } else { delete x.main; } }
 const sameName = (list, q) => list.some(x => x && x.name.toLowerCase() === q);
 /* Sceneries (sem repetições) de um conjunto de Scenes — para as fichas do Book, do Story Arc e do Character */
 function scenesSceneries(scenes){ const ids = new Set(); scenes.forEach(s => s.sceneries.forEach(x => ids.add(x))); return state.sceneries.filter(x => ids.has(x.id)); }
@@ -351,7 +357,7 @@ function entityLabel(kind, id){
   if (kind === 'scene'){ const s = state.scenes[id]; return s ? _('Cena: ') + (s.title || _('Sem título')) : null; }
   if (kind === 'arc'){ const a = arcById(id); return a ? _('Arco Narrativo: ') + a.name : null; }
   if (kind === 'character'){ const c = charById(id); return c ? _('Personagem: ') + c.name : null; }
-  if (kind === 'scenery'){ const x = sceneryById(id); return x ? _('Cenário: ') + x.name : null; }
+  if (kind === 'scenery'){ const x = sceneryById(id); return x ? _('Localização: ') + x.name : null; }
   if (kind === 'goal'){ const g = (state.goals || []).find(x => x.id === id); return g ? _('Objetivo de pesquisa: ') + (g.title || _('Sem título')) : null; }
   return null;
 }
@@ -367,12 +373,23 @@ function toast(msg){
   const t = h('div', {class:'toast'}, msg); $('#toasts').append(t);
   setTimeout(() => t.classList.add('out'), 2600); setTimeout(() => t.remove(), 3100);
 }
+/* Aviso com «Anular»: para o que se faz logo, sem perguntar antes (mover, eliminar uma Cena, uma Nota…).
+   O botão só anula se entretanto nada mais mudou; depois disso, fica o Anular da barra de topo (Ctrl+Z). */
+function snack(msg){
+  document.querySelectorAll('.toast.snack').forEach(x => x.remove()); // um de cada vez
+  const snap = Hist.last, t = h('div', {class:'toast snack', role:'status'}, h('span', {class:'snack-t'}, msg));
+  const out = () => { t.classList.add('out'); setTimeout(() => t.remove(), 400); };
+  if (!tourMode && Hist.undo.length) t.append(h('button', {class:'snack-undo', onclick:() => { t.remove(); if (Hist.last === snap) undo(); else toast(_('Entretanto houve outras alterações: use Anular na barra de topo.')); }}, _('Anular')));
+  $('#toasts').append(t); setTimeout(out, 7000);
+}
 const openModals = [];
+/* uma ficha «ao lado» (ver fichas.js) não tapa nem bloqueia o que está por trás */
+const modalsBlock = () => openModals.some(m => !m.docked);
 let quietModals = false; // ao repor fichas depois de uma sincronização, as janelas reaparecem sem animação
-const modalsChanged = () => { if (typeof Dual !== 'undefined') Dual.report(); if (typeof fabUI === 'function') fabUI(); };
+const modalsChanged = () => { if (typeof Dual !== 'undefined') Dual.report(); if (typeof fabUI === 'function') fabUI(); if (typeof dockUI === 'function') dockUI(); };
 /* Enquanto há uma janela aberta (ou a visita a decorrer), o que está por trás não recebe foco nem cliques. */
 function syncInert(){
-  const t = typeof Tour !== 'undefined' && Tour.active, m = openModals.length > 0;
+  const t = typeof Tour !== 'undefined' && Tour.active, m = modalsBlock();
   for (const s of ['#topbar', 'main', '#rail', '#bnav']){ const el = $(s); if (el) el.inert = t || m; } $('#modals').inert = t;
   openModals.forEach((x, i) => x.back.inert = i < openModals.length - 1);
 }
@@ -389,7 +406,7 @@ function openModal({title, body, wide, onClose, cls}){
       const back2 = prevFocus && prevFocus.isConnected && prevFocus !== document.body ? prevFocus : top && top.back.querySelector('.modal');
       if (back2) try { back2.focus({preventScroll:true}); } catch(e){} } };
   const box = h('div', {class:'modal' + (wide ? ' wide' : '') + (cls ? ' ' + cls : '') + (quietModals ? ' still' : ''), role:'dialog', 'aria-modal':'true', tabIndex:-1},
-    h('div', {class:'modal-head'}, titleEl, h('button', {class:'icon-btn', title:_('Fechar'), onclick:() => api.close()}, '✕')), body);
+    h('div', {class:'modal-head'}, titleEl, h('span', {class:'modal-tools'}, h('button', {class:'icon-btn modal-x', title:_('Fechar'), 'aria-label':_('Fechar'), onclick:() => api.close()}, svgIcon('x')))), body);
   back.append(box);
   // fecha com um clique no fundo — mas não com o 2.º clique de um duplo clique, nem ao usar a barra de deslocamento
   let downOnBack = false;

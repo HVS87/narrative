@@ -32,16 +32,38 @@ const ICONS = {
   mergeL:'<path d="M21 6.5h-3.5c-3.5 0-3 5.5-6.5 5.5H4M21 17.5h-3.5c-3.5 0-3-5.5-6.5-5.5M8.5 7.5L4 12l4.5 4.5"/>',
   shield:'<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z"/><path d="M8.8 12.2l2.3 2.3 4.2-4.5"/>',
   check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  down:'<path d="M6 9l6 6 6-6"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
   check2:'<path d="M2.5 12.5l4.5 4.5L16 8M12 16.5l.6.5L22 8"/>',
   circle:'<circle cx="12" cy="12" r="7.5"/>',
   help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8M12 17h.01"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  import:'<path d="M12 3v11M7.5 9.5L12 14l4.5-4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  minus:'<path d="M5 12h14"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  filter:'<path d="M4 6h16M7 12h10M10 18h4"/>',
+  fit:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  grid:'<rect x="3" y="5" width="8" height="5" rx="1.5"/><rect x="13" y="5" width="8" height="5" rx="1.5"/><rect x="3" y="14" width="8" height="5" rx="1.5"/><rect x="13" y="14" width="8" height="5" rx="1.5"/>',
+  panel:'<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M14.5 4v16"/>',
+  window:'<rect x="5" y="6" width="14" height="12" rx="2.5"/><path d="M5 10h14"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1"/><path d="M3 7v11a2 2 0 0 0 2 2h12.5a2 2 0 0 0 1.9-1.4L22 11H7.5a2 2 0 0 0-1.9 1.4L3 20"/>',
+  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  audio:'<path d="M4 13v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="13" width="4" height="7" rx="1.5"/><rect x="17" y="13" width="4" height="7" rx="1.5"/>',
+  video:'<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.5v5l4.5-2.5z"/>',
+  kbd:'<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7 14h10"/>',
+  rows:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+  cards:'<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  spark:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',
+  template:'<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M9 9v11"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
 };
 const svgIcon = (k, cls) => h('span', {class:'nic' + (cls ? ' ' + cls : ''), 'aria-hidden':'true', innerHTML:'<svg viewBox="0 0 24 24">' + ICONS[k] + '</svg>'});
 
 /* ---------- áreas ---------- */
-const NAV_FULL = [['board', _('Narrativa'), 'board'], ['plan', _('Plano'), 'plan'], '-', ['books', _('Tomos'), 'book'], ['arcs', _('Arcos Narrativos'), 'arc', _('Arcos')], ['characters', _('Personagens'), 'people'],
-  ['sceneries', _('Cenários'), 'pin'], '-', ['refs', _('Referências'), 'mark'], ['support', _('Apoio'), 'bulb']];
+const NAV_FULL = [['board', _('Narrativa'), 'board'], ['plan', _('Plano'), 'plan'], '-', ['books', _('Tomos e Capítulos'), 'book', _('Tomos')], ['arcs', _('Arcos Narrativos'), 'arc', _('Arcos')], ['characters', _('Personagens'), 'people'],
+  ['sceneries', _('Localizações'), 'pin'], '-', ['refs', _('Referências'), 'mark'], ['support', _('Apoio'), 'bulb']];
 const NAV_COMPACT = [['board', _('Narrativa'), 'board'], ['plan', _('Plano'), 'plan'], ['elements', _('Elementos'), 'layers'], ['refs', _('Referências'), 'mark'], ['more', _('Mais'), 'more']];
 const ELEMENT_TABS = ['books', 'arcs', 'characters', 'sceneries'];
 /* telemóvel ao alto (ou janela estreita e alta): barra em baixo; telemóvel deitado: barra lateral com os cinco destinos */
@@ -57,7 +79,7 @@ function renderNav(shown){
   if (Nav.built !== mode){ // só se refaz quando muda a forma (assim o foco do teclado não se perde a cada clique)
     Nav.built = mode; rail.innerHTML = ''; bnav.innerHTML = '';
     const item = it => it === '-' ? h('div', {class:'rail-sep', role:'separator'})
-      : h('button', {class:'nav-item', dataset:{tab:it[0]}, 'aria-label':it[3] ? it[1] : null, title:it[3] ? it[1] : null, onclick:e => navGo(it[0], e.currentTarget)}, svgIcon(it[2], 'nav-pill'), h('span', {class:'nav-label'}, it[3] || it[1])); // rótulo curto na barra, nome completo para leitores de ecrã
+      : h('button', {class:'nav-item', dataset:{tab:it[0]}, 'aria-label':it[3] ? it[1] : null, title:it[3] ? it[1] : null, onclick:e => navGo(it[0], e.currentTarget)}, svgIcon(it[2], 'nav-pill'), h('span', {class:'nav-label' + ((it[3] || it[1]).length > 12 ? ' long' : '')}, it[3] || it[1])); // rótulo curto na barra, nome completo para leitores de ecrã
     if (mode !== 'bottom') rail.append(h('button', {id:'createBtn', class:'rail-create', 'aria-haspopup':'menu', 'aria-expanded':'false', 'aria-label':_('Criar'),
       onclick:e => createMenu(e.currentTarget)}, svgIcon('pen', 'rail-fab'), h('span', {class:'rail-cap', 'aria-hidden':'true'}, _('Criar'))));
     (mode === 'bottom' ? bnav : rail).append(...(mode === 'rail' ? NAV_FULL : NAV_COMPACT).map(item));
@@ -75,7 +97,7 @@ function navGo(k, btn){
 /* Elementos (telemóvel): Books, Story Arcs, Characters e Sceneries num seletor no topo da página */
 function elementTabs(tab){
   return h('div', {class:'el-tabs', role:'tablist', 'aria-label':_('Elementos')}, ELEMENT_TABS.map(k => h('button', {class:k === tab ? 'on' : '', role:'tab', 'aria-selected':String(k === tab), dataset:{tab:k},
-    onclick:() => setTab(k)}, TABS.find(t => t[0] === k)[1])));
+    onclick:() => setTab(k)}, k === 'books' ? _('Tomos') : TABS.find(t => t[0] === k)[1]))); // «Tomos e Capítulos» não cabe: o nome completo está no título da página
 }
 
 /* ---------- folhas (telemóvel): uma janela que sobe do fundo do ecrã ---------- */
@@ -104,7 +126,7 @@ function topMenu(btn, items, cls){
 const wasOpen = btn => { const w = btn._wasOpen && performance.now() - btn._downAt < 1500; btn._wasOpen = false; return w; };
 window.addEventListener('pointerdown', e => { const b = e.target.closest && e.target.closest('#tourBtn,#moreBtn,#createBtn,#langBtn');
   if (b){ b._wasOpen = b.getAttribute('aria-expanded') === 'true'; b._downAt = performance.now(); } }, true);
-function helpMenu(btn){ if (Tour.active || wasOpen(btn)) return; topMenu(btn, [{label:_('Visita guiada'), action:() => startTour()}, {label:_('Visita detalhada'), action:() => startTour('deep')}], 'help-menu'); }
+function helpMenu(btn){ if (Tour.active || wasOpen(btn)) return; topMenu(btn, [{label:_('Visita guiada'), action:() => startTour()}, {label:_('Visita detalhada'), action:() => startTour('deep')}, '-', {label:_('Atalhos de teclado'), action:shortcutsSheet}], 'help-menu'); }
 function moreMenu(btn){
   if (tourMode || wasOpen(btn)) return;
   const items = [{label:_('Novo Projeto'), action:newProject}, {label:_('Abrir Projeto…'), action:pickProjectFile}, {label:_('Guardar Projeto'), action:() => exportProject()},
@@ -116,7 +138,7 @@ function settingsClick(){ if (tourMode) return; if (activeTab === 'settings') cl
 
 /* ---------- Criar ---------- */
 const CREATE = [['scene', _('Cena'), 'scene'], ['chapter', _('Capítulo'), 'chapter'], ['book', _('Tomo'), 'book'], ['arc', _('Arco Narrativo'), 'arc'], ['character', _('Personagem'), 'people'],
-  ['scenery', _('Cenário'), 'pin'], ['note', _('Nota'), 'note'], ['ref', _('Referência'), 'mark'], ['goal', _('Objetivo de pesquisa'), 'flag']];
+  ['scenery', _('Localização'), 'pin'], ['note', _('Nota'), 'note'], ['ref', _('Referência'), 'mark'], ['goal', _('Objetivo de pesquisa'), 'flag']];
 function createMenu(btn){
   if (tourMode || projNone() || wasOpen(btn)) return;
   if (coarse()) return createSheet(); // num ecrã tátil, uma folha com alvos grandes
@@ -198,7 +220,7 @@ function revealScene(id){
   requestAnimationFrame(() => {
     if (narrView() === 'list'){ const r = document.querySelector(`.nl-row[data-scene="${id}"]`); if (r){ r.scrollIntoView({block:'nearest'}); flash(r); } return; }
     const c = target['s:' + id], el = els['s:' + id] && els['s:' + id][0]; if (!c || !el) return;
-    const sc = $('#board-scroll'); sc.scrollTo({left:Math.max(0, c.x - (sc.clientWidth + B.GUT - B.SW) / 2), top:Math.max(0, c.y - (sc.clientHeight - HEAD_H - B.SH) / 2), behavior:'smooth'}); flash(el);
+    const sc = $('#board-scroll'), z = Z(); sc.scrollTo({left:Math.max(0, (c.x - B.GUT / 2 + B.SW / 2) * z - sc.clientWidth / 2), top:Math.max(0, (c.y + HEAD_H / 2 + B.SH / 2) * z - sc.clientHeight / 2), behavior:'smooth'}); flash(el);
   });
 }
 function revealChapter(id){
@@ -206,15 +228,16 @@ function revealChapter(id){
   requestAnimationFrame(() => {
     if (narrView() === 'list'){ const r = document.querySelector(`.nl-chead[data-chapter="${id}"]`); if (r){ r.scrollIntoView({block:'nearest'}); flash(r); } return; }
     const c = target['c:' + id], el = els['c:' + id] && els['c:' + id][0]; if (!c || !el) return;
-    const sc = $('#board-scroll'); sc.scrollTo({left:Math.max(0, c.x - B.GUT - 24), behavior:'smooth'}); flash(el);
+    const sc = $('#board-scroll'); sc.scrollTo({left:Math.max(0, (c.x - B.GUT - 24) * Z()), behavior:'smooth'}); flash(el);
   });
 }
 
 /* ---------- Narrativa em Lista (telemóvel ao alto): Books › Chapters › Scenes, pela Ordem Narrativa ---------- */
 const Narr = { view:null }; // null: automático — Lista com o telemóvel ao alto, Quadro deitado
 function narrView(){
-  if (navMode() === 'rail') return 'board';
-  if (typeof Tour !== 'undefined' && Tour.active) return Narr.tourList ? 'list' : 'board'; // a visita mostra o quadro (e a lista no passo dela)
+  const touring = typeof Tour !== 'undefined' && Tour.active;
+  if (navMode() === 'rail') return !touring && Narr.view === 'list' ? 'list' : 'board'; // no PC, o Quadro; a Lista, quando escolhida na barra do quadro
+  if (touring) return Narr.tourList ? 'list' : 'board'; // a visita mostra o quadro (e a lista no passo dela)
   return Narr.view || (navMode() === 'bottom' ? 'list' : 'board');
 }
 function viewToggle(compact){
@@ -228,10 +251,11 @@ function narrUI(){
   sc.hidden = list; nl.hidden = !list;
   const cn = $('#headLayer .corner'); if (cn){ const old = cn.querySelector('.view-toggle'); if (old) old.remove(); if (navMode() !== 'rail') cn.prepend(viewToggle(true)); }
   if (list) renderNarrList(nl); else nl.innerHTML = '';
+  boardBarUI(); // filtros e vistas, por cima do quadro e da Lista
 }
 function renderNarrList(nl){
   const st = nl.scrollTop, nm = narrIndexMap(), fr = frontiers(); nl.innerHTML = '';
-  nl.append(h('div', {class:'nl-top'}, viewToggle(false)));
+  if (navMode() !== 'rail') nl.append(h('div', {class:'nl-top'}, viewToggle(false))); // no PC, a escolha da vista está na barra do quadro
   state.books.forEach((b, bi) => {
     const p = progOf(bookScenes(b), 'write'), sec = h('section', {class:'nl-book', dataset:{book:b.id}});
     if (b.color) sec.style.setProperty('--book', b.color);
@@ -260,7 +284,7 @@ function narrRow(s, nm){
   const sub = [pov ? _('POV {nome}', {nome:pov.name}) : null, ...places].filter(Boolean).join(' · ') || (arc ? arc.name : '');
   const row = h('button', {class:'nl-row' + (pickLink === s.id ? ' link-from' : ''), dataset:{scene:s.id},
     'aria-label':_('{n}. {nome}. Arco Narrativo: {arco}. {estado}.', {n:nm[s.id] + 1, nome:s.title || _('Sem título'), arco:arc ? arc.name : '—', estado:stTxt})},
-    h('i', {class:'nl-mark', 'aria-hidden':'true'}), h('span', {class:'nl-tx'}, h('b', null, s.title || _('Sem título')), h('small', null, sub)),
+    h('i', {class:'nl-mark', 'aria-hidden':'true'}), h('span', {class:'nl-tx'}, h('b', null, s.title || _('Sem título')), h('small', null, sub)), lateMark(s),
     h('span', {class:'nl-st' + (r ? ' rv' : w ? ' wr' : ''), 'aria-hidden':'true', dataset:{st:stTxt}}, svgIcon(r ? 'check2' : w ? 'check' : 'circle')));
   row.style.setProperty('--arc', arcStroke(arc));
   wireRow(row, s.id);

@@ -1,8 +1,8 @@
 'use strict';
 /* ===== Áreas da ferramenta (separadores): a navegação que as mostra está em nav.js ===== */
-const TABS = [['board', _('Narrativa')], ['plan', _('Calendarização e Objetivos')], ['books', _('Tomos')], ['arcs', _('Arcos Narrativos')], ['characters', _('Personagens')], ['sceneries', _('Cenários')], ['refs', _('Referências')], ['support', _('Materiais de Apoio')], ['settings', _('Definições do Projeto')]];
+const TABS = [['board', _('Narrativa')], ['plan', _('Calendarização e Objetivos')], ['books', _('Tomos e Capítulos')], ['arcs', _('Arcos Narrativos')], ['characters', _('Personagens')], ['sceneries', _('Localizações')], ['refs', _('Referências')], ['support', _('Materiais de Apoio')], ['settings', _('Definições do Projeto')]];
 let activeTab = 'board';
-const filters = { booksChar:null, booksArc:null, charsBook:'', charsRole:'all', arcsChar:null, scnChar:null, refsType:'all', supSec:'narrador', supQ:'', planView:'overview', goalFilter:'all', calMonth:null, calDay:null };
+const filters = { scnRole:'all', booksChar:null, booksArc:null, charsBook:'', charsRole:'all', arcsChar:null, scnChar:null, refsType:'all', supSec:'narrador', supQ:'', planView:'overview', goalFilter:'all', calMonth:null, calDay:null };
 let extraPalettes = [];
 const PRESET_PALETTES = [
   {name:_('Meia-noite'), h:220, mode:'dark'}, {name:_('Papel'), h:220, mode:'light'}, {name:_('Floresta'), h:150, mode:'dark'}, {name:_('Vinho'), h:345, mode:'dark'},
@@ -27,9 +27,9 @@ function renderAll(){
   renderNav(shown); // barra lateral (PC) ou barra de baixo (telemóvel): a área à vista fica assinalada
   $('#view-board').hidden = shown !== 'board';
   $('#view-page').hidden = shown === 'board';
-  if (shown === 'board'){ renderBoard(); narrUI(); } else renderPage(shown); // no telemóvel ao alto, a Narrativa abre em Lista
+  if (shown === 'board'){ viewBefore(); renderBoard(); narrUI(); } else renderPage(shown); // no telemóvel ao alto, a Narrativa abre em Lista
   drawerUI(drawer);
-  updateHistUI(); orientHint();
+  updateHistUI(); orientHint(); coachCheck();
 }
 /* a barra lateral das Definições (telemóvel) */
 function drawerUI(open){
@@ -75,79 +75,166 @@ function renderPage(tab){
   if (ELEMENT_TABS.includes(tab) && navMode() !== 'rail') page.append(elementTabs(tab)); // no telemóvel, os quatro estão em «Elementos»
   ({ books:pageBooks, characters:pageChars, arcs:pageArcs, sceneries:pageSceneries, refs:pageRefs, plan:pagePlan, support:pageSupport, settings:pageSettings })[tab](page);
 }
+/* ---------- listas de elementos: a mesma barra em todas (procurar, ordenar, cartões ou linhas), iniciais e presença ---------- */
+const LS_LAYOUT = 'narrativa.listas';
+const ListUI = { q:{}, sort:{}, layout:lsGet(LS_LAYOUT) === 'rows' ? 'rows' : 'cards', redraw:null };
+const initials = name => { const w = String(name || '').trim().split(/\s+/).filter(Boolean); return ((w[0] || '?').charAt(0) + (w.length > 1 ? w[w.length - 1].charAt(0) : '')).toUpperCase(); };
+/* o Arco Narrativo em que a Personagem mais aparece: dá a cor às suas iniciais */
+function charArc(cid){
+  const n = {}; Object.values(state.scenes).forEach(s => { if (s.pov === cid || s.chars.includes(cid)) n[s.arcId] = (n[s.arcId] || 0) + 1; });
+  const best = Object.keys(n).sort((a, b) => n[b] - n[a])[0]; return best ? arcById(best) : null;
+}
+const avatar = c => { const a = charArc(c.id); return h('span', {class:'avatar' + (a ? '' : ' none'), 'aria-hidden':'true', style:a ? {background:arcColor(a)} : null}, initials(c.name)); };
+/* mapa de presença: uma tira com todas as Cenas da narrativa, pela Ordem Narrativa e separadas por Tomo, preenchida onde o
+   elemento aparece — vê-se de relance quem desaparece a meio da história */
+function presence(has, color){
+  const total = narrOrder().length; if (!total) return null; let n = 0;
+  const strip = h('span', {class:'pres', role:'img'});
+  state.books.forEach(b => { const sc = bookScenes(b); if (!sc.length) return;
+    const stops = [], w = 100 / sc.length; sc.forEach((s, i) => { const on = has(s); if (on) n++; stops.push((on ? 'var(--pc)' : 'var(--po)') + ' ' + (i * w).toFixed(3) + '% ' + ((i + 1) * w).toFixed(3) + '%'); });
+    strip.append(h('i', {style:{flex:sc.length, '--n':sc.length, '--pc':color || 'var(--accent)', '--fill':'linear-gradient(90deg,' + stops.join(',') + ')'}})); });
+  const tx = _('Presença ao longo da narrativa: {n} de {total} Cenas.', {n, total}); strip.setAttribute('aria-label', tx); strip.dataset.tip = tx;
+  return strip;
+}
+const firstIdx = has => { const o = narrOrder(), i = o.findIndex(id => state.scenes[id] && has(state.scenes[id])); return i < 0 ? 1e9 : i; };
+const SORT_NAME = ['name', _('Ordenar: nome')], SORT_SCENES = ['scenes', _('Ordenar: mais Cenas')], SORT_FIRST = ['first', _('Ordenar: primeira aparição')];
+/* «Importar»: Personagens, Localizações e Referências de outro projeto aberto (projects.js) */
+const importBtn = kind => h('button', {class:'btn imp-btn', dataset:{imp:kind}, onclick:() => importDialog(kind)}, svgIcon('import'), h('span', null, _('Importar')));
+function listTools(tab, sorts){
+  const q = h('input', {class:'inp list-q', type:'search', placeholder:_('Procurar…'), 'aria-label':_('Procurar nesta lista'), value:ListUI.q[tab] || '', oninput:e => { ListUI.q[tab] = e.target.value; ListUI.redraw && ListUI.redraw(); }});
+  const sort = sorts.length > 1 ? selectEl(sorts.map(([v, l]) => ({value:v, label:l})), ListUI.sort[tab] || sorts[0][0], v => { ListUI.sort[tab] = v; ListUI.redraw && ListUI.redraw(); }, 'inp list-sort') : null;
+  if (sort) sort.setAttribute('aria-label', _('Ordenar'));
+  const lay = h('div', {class:'view-seg list-lay', role:'group', 'aria-label':_('Disposição da lista')}, [['cards', _('Cartões'), 'cards'], ['rows', _('Linhas'), 'rows']].map(([k, l, ic]) =>
+    h('button', {'aria-pressed':String(ListUI.layout === k), 'aria-label':l, dataset:{lay:k}, onclick:() => { ListUI.layout = k; lsSet(LS_LAYOUT, k); renderAll(); }}, svgIcon(ic))));
+  return {q, sort, lay};
+}
+/* items: [{name, n (Cenas), first, card() → o cartão, lead e meta (para a linha), pres() → a tira, open}] */
+function listBody(tab, items, emptyMsg, def){
+  const raw = (ListUI.q[tab] || '').trim(), q = supNorm(raw), k = ListUI.sort[tab] || def;
+  const list = q ? items.filter(o => supNorm(o.name).includes(q)) : items.slice();
+  if (k === 'name') list.sort((a, b) => a.name.localeCompare(b.name)); else if (k === 'scenes') list.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name)); else if (k === 'first') list.sort((a, b) => a.first - b.first || a.name.localeCompare(b.name));
+  if (!list.length) return h('div', {class:'empty'}, q && items.length ? _('Nada encontrado para «{q}».', {q:raw}) : emptyMsg);
+  if (ListUI.layout === 'rows') return h('div', {class:'el-rows'}, list.map(o => h('div', {class:'card el-row', onclick:o.open}, o.lead || null,
+    h('div', {class:'el-main'}, h('h3', null, o.name), o.meta ? h('div', {class:'muted small'}, o.meta) : null), (o.pres && o.pres()) || h('span', {class:'pres none'}),
+    h('span', {class:'el-n muted small'}, o.n != null ? _n(o.n, '{n} Cena', '{n} Cenas') : (o.side || '')))));
+  return h('div', {class:'grid'}, list.map(o => { const c = o.card(), p = o.pres && o.pres(); if (p) c.append(p); return c; }));
+}
+function listPage(page, tab, title, filterEls, actions, sorts, items, emptyMsg){
+  const t = listTools(tab, sorts), box = h('div', {class:'list-box'});
+  page.append(h('div', {class:'page-head'}, h('h1', null, title), ...filterEls, t.q, t.sort, h('span', {class:'spacer'}), t.lay, ...actions), box);
+  const draw = () => box.replaceChildren(listBody(tab, items(), emptyMsg(), sorts[0][0]));
+  ListUI.redraw = draw; draw();
+}
 function pageBooks(page){
-  page.append(h('div', {class:'page-head'}, h('h1', null, _('Tomos')),
-    filterBox(_('Personagem'), charItems, filters.booksChar, v => filters.booksChar = v),
-    filterBox(_('Arco Narrativo'), arcItems, filters.booksArc, v => filters.booksArc = v),
-    h('span', {class:'spacer'}), h('button', {class:'btn primary', onclick:() => { filters.booksChar = filters.booksArc = null; addBook(); }}, _('+ Novo Tomo'))));
-  const list = state.books.filter(b => (!filters.booksChar || bookCharacters(b).some(x => x.ch.id === filters.booksChar)) && (!filters.booksArc || bookArcIds(b).includes(filters.booksArc)));
-  const grid = h('div', {class:'grid'});
-  list.forEach(b => { const n = narratorByKey(b.narrator);
-    grid.append(h('div', {class:'card', onclick:() => openBookFicha(b.id)}, b.color ? h('div', {class:'bar', style:{background:b.color}}) : null,
-      h('div', {class:'kicker'}, _('Tomo {n}', {n:state.books.indexOf(b) + 1})), h('h3', null, b.name),
-      h('div', {class:'muted small'}, n ? n.name : _('Narrador por definir')),
-      h('div', {class:'muted small'}, _n(b.chapters.length, '{n} Capítulo', '{n} Capítulos') + ' · ' + _n(bookScenes(b).length, '{n} Cena', '{n} Cenas') + ' · ' + _n(bookCharacters(b).length, '{n} Personagem', '{n} Personagens')),
-      h('div', {class:'chips', style:{marginTop:'8px'}}, bookArcIds(b).map(a => arcById(a) && h('span', {class:'dot', title:arcById(a).name, style:{background:arcStroke(arcById(a))}}))))); });
-  page.append(list.length ? grid : h('div', {class:'empty'}, _('Nenhum Tomo corresponde aos filtros.')));
+  const list = () => state.books.filter(b => (!filters.booksChar || bookCharacters(b).some(x => x.ch.id === filters.booksChar)) && (!filters.booksArc || bookArcIds(b).includes(filters.booksArc)));
+  listPage(page, 'books', _('Tomos e Capítulos'),
+    [filterBox(_('Personagem'), charItems, filters.booksChar, v => filters.booksChar = v), filterBox(_('Arco Narrativo'), arcItems, filters.booksArc, v => filters.booksArc = v)],
+    [h('button', {class:'btn primary', onclick:() => { filters.booksChar = filters.booksArc = null; addBook(); }}, _('+ Novo Tomo'))],
+    [['order', _('Ordenar: ordem do livro')], SORT_NAME, SORT_SCENES],
+    () => list().map(b => { const n = narratorByKey(b.narrator), ids = new Set(bookScenes(b).map(s => s.id)), i = state.books.indexOf(b);
+      const meta = _n(b.chapters.length, '{n} Capítulo', '{n} Capítulos') + ' · ' + _n(ids.size, '{n} Cena', '{n} Cenas') + ' · ' + _n(bookCharacters(b).length, '{n} Personagem', '{n} Personagens');
+      return {name:b.name, n:ids.size, first:i, open:() => openBookFicha(b.id), lead:h('span', {class:'el-lead'}, i + 1), meta:(n ? n.name : _('Narrador por definir')) + ' · ' + meta,
+        pres:() => presence(s => ids.has(s.id), b.color || null),
+        card:() => h('div', {class:'card', onclick:() => openBookFicha(b.id)}, b.color ? h('div', {class:'bar', style:{background:b.color}}) : null,
+          h('div', {class:'kicker'}, _('Tomo {n}', {n:i + 1})), h('h3', null, b.name),
+          h('div', {class:'muted small'}, n ? n.name : _('Narrador por definir')), h('div', {class:'muted small'}, meta),
+          h('div', {class:'chips', style:{marginTop:'8px'}}, bookArcIds(b).map(a => arcById(a) && h('span', {class:'dot', title:arcById(a).name, style:{background:arcStroke(arcById(a))}}))))}; }),
+    () => _('Nenhum Tomo corresponde aos filtros.'));
+  /* por baixo dos Tomos, os Capítulos (dos Tomos à vista): mesma procura, mesma ordenação e mesma disposição */
+  const prev = ListUI.redraw, hd = h('div', {class:'list-sub'}), cbox = h('div', {class:'list-box'}), thd = h('h2', {class:'list-subt'}, _('Tomos'));
+  page.querySelector('.list-box').before(thd); page.append(hd, cbox);
+  const chapters = () => { const out = [];
+    list().forEach(b => { const bi = state.books.indexOf(b); b.chapters.forEach((c, ci) => { const sc = chapterScenes(c), ids = new Set(sc.map(s => s.id));
+      if (filters.booksChar && !sc.some(s => s.pov === filters.booksChar || s.chars.includes(filters.booksChar))) return;
+      if (filters.booksArc && !sc.some(s => s.arcId === filters.booksArc)) return;
+      const w = chapterProg(c, 'write'), rv = chapterProg(c, 'review'), go = () => { setTab('board'); if (narrView() !== 'list') revealChapter(c.id); else revealChapter(c.id); };
+      const meta = _n(sc.length, '{n} Cena', '{n} Cenas') + (sc.length ? ' · ' + _('{w} escritas · {v} revistas', {w:w.done, v:rv.done}) : '');
+      out.push({name:c.name || _('Sem título'), n:sc.length, first:out.length, open:go, lead:h('span', {class:'el-lead'}, ci + 1), meta:_('Tomo {n}', {n:bi + 1}) + ' · ' + b.name + ' · ' + meta,
+        pres:() => presence(s => ids.has(s.id), b.color || null),
+        card:() => h('div', {class:'card ch-card', dataset:{chapter:c.id}, onclick:go}, b.color ? h('div', {class:'bar', style:{background:b.color}}) : null,
+          h('div', {class:'kicker'}, _('Tomo {n}', {n:bi + 1}) + ' · ' + _('Capítulo {n}', {n:ci + 1})), h('h3', null, c.name || _('Sem título')),
+          h('div', {class:'muted small'}, b.name), h('div', {class:'muted small'}, meta), layerBar('chapter', c, 'in-card'))}); }); });
+    return out; };
+  const drawCh = () => { const items = chapters();
+    hd.replaceChildren(h('h2', {class:'list-subt'}, _('Capítulos'), h('span', {class:'muted small'}, ' · ' + items.length)), h('span', {class:'spacer'}), h('button', {class:'btn', onclick:() => newChapterDialog()}, _('+ Novo Capítulo')));
+    cbox.replaceChildren(listBody('books', items, state.books.some(b => b.chapters.length) ? _('Nenhum Capítulo corresponde aos filtros.') : _('Ainda não existem Capítulos.'), 'order')); };
+  ListUI.redraw = () => { prev(); drawCh(); }; drawCh();
 }
 function pageChars(page){
   const seg = h('div', {class:'seg'}, [['all', _('Todos')], ['main', _('Personagens Principais')], ['side', _('Personagens Secundárias')]].map(([k, l]) =>
     h('button', {class:filters.charsRole === k ? 'on' : '', onclick:() => { filters.charsRole = k; renderAll(); }}, l)));
   const sel = selectEl([{value:'', label:_('Todos os Tomos')}, ...state.books.map(b => ({value:b.id, label:b.name}))], filters.charsBook, v => { filters.charsBook = v; renderAll(); });
   sel.style.width = '220px';
-  page.append(h('div', {class:'page-head'}, h('h1', null, _('Personagens')), sel, seg, h('span', {class:'spacer'}),
-    h('button', {class:'btn primary', onclick:() => { const c = newCharacter(); commit(); openCharFicha(c.id, true); }}, _('+ Nova Personagem'))));
-  const list = state.characters.filter(c => {
+  const list = () => state.characters.filter(c => {
     if (filters.charsBook && !charBooks(c.id).some(b => b.id === filters.charsBook)) return false;
     return filters.charsRole === 'all' || (filters.charsRole === 'main') === isMain(c.id, filters.charsBook);
   }).sort((a, b) => a.name.localeCompare(b.name));
-  const grid = h('div', {class:'grid'});
-  list.forEach(c => { const main = isMain(c.id, filters.charsBook); const bs = charBooks(c.id);
-    grid.append(h('div', {class:'card', onclick:() => openCharFicha(c.id)}, h('h3', null, c.name || _('Sem nome')),
-      h('div', {class:'chips'}, badge(main ? _('Personagem Principal') : _('Personagem Secundária'), main ? 'main' : ''), badge(c.gender || 'N/D'), badge(c.age ? c.age + ' anos' : _('idade N/D'))),
-      h('div', {class:'muted small book-list', style:{marginTop:'8px'}}, bs.length ? bs.map(b => h('span', null, bookDot(b), b.name)) : _('Sem Tomos associados')))); });
-  page.append(list.length ? grid : h('div', {class:'empty'}, state.characters.length ? _('Nenhuma Personagem corresponde aos filtros.') : _('Ainda não existem Personagens.')));
+  listPage(page, 'characters', _('Personagens'), [sel, seg],
+    [importBtn('characters'), h('button', {class:'btn primary', onclick:() => { const c = newCharacter(); commit(); openCharFicha(c.id, true); }}, _('+ Nova Personagem'))],
+    [SORT_NAME, SORT_SCENES, SORT_FIRST],
+    () => list().map(c => { const main = isMain(c.id, filters.charsBook), bs = charBooks(c.id), has = s => s.pov === c.id || s.chars.includes(c.id), a = charArc(c.id);
+      const role = main ? _('Personagem Principal') : _('Personagem Secundária');
+      return {name:c.name || _('Sem nome'), n:allScenes().filter(has).length, first:firstIdx(has), open:() => openCharFicha(c.id), lead:avatar(c),
+        meta:[role, c.age ? _('{n} anos', {n:c.age}) : null, bs.length ? bs.map(b => b.name).join(', ') : _('Sem Tomos associados')].filter(Boolean).join(' · '),
+        pres:() => presence(has, a ? arcStroke(a) : null),
+        card:() => h('div', {class:'card', onclick:() => openCharFicha(c.id)}, h('div', {class:'card-top'}, avatar(c), h('h3', null, c.name || _('Sem nome'))),
+          h('div', {class:'chips'}, badge(role, main ? 'main' : ''), badge(c.gender || 'N/D'), badge(c.age ? _('{n} anos', {n:c.age}) : _('idade N/D'))),
+          h('div', {class:'muted small book-list', style:{marginTop:'8px'}}, bs.length ? bs.map(b => h('span', null, bookDot(b), b.name)) : _('Sem Tomos associados')))}; }),
+    () => state.characters.length ? _('Nenhuma Personagem corresponde aos filtros.') : _('Ainda não existem Personagens.'));
 }
 function pageArcs(page){
-  page.append(h('div', {class:'page-head'}, h('h1', null, _('Arcos Narrativos')), filterBox(_('Personagem'), charItems, filters.arcsChar, v => filters.arcsChar = v),
-    h('span', {class:'spacer'}), h('button', {class:'btn primary', onclick:async () => { const a = await promptNewArc(); if (a) openArcFicha(a.id); }}, _('+ Novo Arco Narrativo'))));
-  const list = orderedArcs().filter(l => !filters.arcsChar || arcCharIds(l.arc.id).includes(filters.arcsChar));
-  const grid = h('div', {class:'grid'});
-  list.forEach(({arc}) => { const own = arcOwnScenes(arc.id); const parent = arc.parentId && arcById(arc.parentId);
-    const bs = state.books.filter(b => bookArcIds(b).includes(arc.id));
-    grid.append(h('div', {class:'card', onclick:() => openArcFicha(arc.id)}, h('div', {class:'bar', style:{background:arcStroke(arc)}}),
-      h('div', {class:'kicker'}, parent ? _('↳ Ramo de ') + parent.name : _('Arco Narrativo')), h('h3', null, arc.name),
-      h('div', {class:'muted small'}, _n(own.length, '{n} Cena', '{n} Cenas') + ' · ' + _n(arcCharIds(arc.id).length, '{n} Personagem', '{n} Personagens')),
-      h('div', {class:'muted small book-list'}, bs.length ? bs.map(b => h('span', null, bookDot(b), b.name)) : _('Sem Tomos')))); });
-  page.append(list.length ? grid : h('div', {class:'empty'}, state.arcs.length ? _('Nenhum Arco Narrativo corresponde ao filtro.') : _('Ainda não existem Arcos Narrativos.')));
+  const list = () => orderedArcs().filter(l => !filters.arcsChar || arcCharIds(l.arc.id).includes(filters.arcsChar));
+  listPage(page, 'arcs', _('Arcos Narrativos'), [filterBox(_('Personagem'), charItems, filters.arcsChar, v => filters.arcsChar = v)],
+    [h('button', {class:'btn primary', onclick:async () => { const a = await promptNewArc(); if (a) openArcFicha(a.id); }}, _('+ Novo Arco Narrativo'))],
+    [['order', _('Ordenar: ordem do quadro')], SORT_NAME, SORT_SCENES, SORT_FIRST],
+    () => list().map(({arc}) => { const own = arcOwnScenes(arc.id), parent = arc.parentId && arcById(arc.parentId), bs = state.books.filter(b => bookArcIds(b).includes(arc.id)), has = s => s.arcId === arc.id;
+      const cnt = _n(own.length, '{n} Cena', '{n} Cenas') + ' · ' + _n(arcCharIds(arc.id).length, '{n} Personagem', '{n} Personagens'), kick = parent ? _('↳ Ramo de ') + parent.name : _('Arco Narrativo');
+      return {name:arc.name, n:own.length, first:firstIdx(has), open:() => openArcFicha(arc.id), lead:h('span', {class:'dot el-dot', style:{background:arcStroke(arc)}}), meta:kick + ' · ' + (bs.length ? bs.map(b => b.name).join(', ') : _('Sem Tomos')),
+        pres:() => presence(has, arcStroke(arc)),
+        card:() => h('div', {class:'card', onclick:() => openArcFicha(arc.id)}, h('div', {class:'bar', style:{background:arcStroke(arc)}}),
+          h('div', {class:'kicker'}, kick), h('h3', null, arc.name), h('div', {class:'muted small'}, cnt),
+          h('div', {class:'muted small book-list'}, bs.length ? bs.map(b => h('span', null, bookDot(b), b.name)) : _('Sem Tomos')))}; }),
+    () => state.arcs.length ? _('Nenhum Arco Narrativo corresponde ao filtro.') : _('Ainda não existem Arcos Narrativos.'));
 }
 function pageSceneries(page){
-  page.append(h('div', {class:'page-head'}, h('h1', null, _('Cenários')), filterBox(_('Personagem'), charItems, filters.scnChar, v => filters.scnChar = v),
-    h('span', {class:'spacer'}), h('button', {class:'btn primary', onclick:() => { filters.scnChar = null; const x = newScenery(); commit(); openSceneryFicha(x.id, true); }}, _('+ Novo Cenário'))));
-  const list = state.sceneries.filter(x => !filters.scnChar || x.chars.includes(filters.scnChar)).sort((a, b) => a.name.localeCompare(b.name));
-  const grid = h('div', {class:'grid'});
-  list.forEach(x => { const names = x.chars.map(charById).filter(Boolean).map(c => c.name);
-    grid.append(h('div', {class:'card', onclick:() => openSceneryFicha(x.id)}, h('div', {class:'kicker'}, _('Cenário')), h('h3', null, x.name),
-      h('div', {class:'muted small'}, _n(sceneryScenes(x.id).length, '{n} Cena', '{n} Cenas') + ' · ' + _n(names.length, '{n} Personagem', '{n} Personagens')),
-      h('div', {class:'muted small', style:{marginTop:'6px'}}, names.length ? names.join(' · ') : _('Sem Personagens associadas')))); });
-  page.append(list.length ? grid : h('div', {class:'empty'}, state.sceneries.length ? _('Nenhum Cenário corresponde ao filtro.') : _('Ainda não existem Cenários. Um Cenário é um lugar ou cenário onde decorrem Cenas.')));
+  const list = () => state.sceneries.filter(x => (!filters.scnChar || x.chars.includes(filters.scnChar)) && (filters.scnRole === 'all' || (filters.scnRole === 'main') === !!x.main)).sort((a, b) => a.name.localeCompare(b.name));
+  const seg = h('div', {class:'seg loc-seg'}, [['all', _('Todas')], ['main', _('Localizações Principais')], ['side', _('Localizações Secundárias')]].map(([k, l]) =>
+    h('button', {class:filters.scnRole === k ? 'on' : '', dataset:{role:k}, onclick:() => { filters.scnRole = k; renderAll(); }}, l)));
+  listPage(page, 'sceneries', _('Localizações'), [filterBox(_('Personagem'), charItems, filters.scnChar, v => filters.scnChar = v), seg],
+    [importBtn('sceneries'), h('button', {class:'btn primary', onclick:() => { filters.scnChar = null; const x = newScenery(); commit(); openSceneryFicha(x.id, true); }}, _('+ Nova Localização'))],
+    [SORT_NAME, SORT_SCENES, SORT_FIRST],
+    () => list().map(x => { const names = x.chars.map(charById).filter(Boolean).map(c => c.name), has = s => s.sceneries.includes(x.id), n = sceneryScenes(x.id).length;
+      const role = x.main ? _('Localização Principal') : _('Localização Secundária');
+      return {name:x.name, n, first:firstIdx(has), open:() => openSceneryFicha(x.id), lead:svgIcon('pin', 'el-ic' + (x.main ? ' main' : '')), meta:role + ' · ' + (names.length ? names.join(' · ') : _('Sem Personagens associadas')),
+        pres:() => presence(has, null),
+        card:() => h('div', {class:'card', onclick:() => openSceneryFicha(x.id)}, h('div', {class:'kicker'}, _('Localização')), h('h3', null, x.name),
+          h('div', {class:'chips', style:{marginBottom:'6px'}}, badge(role, x.main ? 'main' : ''), locSuggest(x) ? badge(_('Sugestão: principal'), 'sug') : null),
+          h('div', {class:'muted small'}, _n(n, '{n} Cena', '{n} Cenas') + ' · ' + _n(names.length, '{n} Personagem', '{n} Personagens')),
+          h('div', {class:'muted small', style:{marginTop:'6px'}}, names.length ? names.join(' · ') : _('Sem Personagens associadas')))}; }),
+    () => state.sceneries.length ? _('Nenhuma Localização corresponde ao filtro.') : _('Ainda não existem Localizações. Uma Localização é um lugar onde decorrem Cenas.'));
+  /* as que já aparecem em várias Cenas e ainda não foram marcadas: sugestão, por cima da lista */
+  const sug = state.sceneries.filter(locSuggest).sort((a, b) => sceneryScenes(b.id).length - sceneryScenes(a.id).length);
+  if (sug.length) page.querySelector('.list-box').before(h('div', {class:'loc-sugs'}, sug.slice(0, 3).map(x => locSuggestBox(x))));
 }
 function pageRefs(page){
   const seg = h('div', {class:'seg'}, [['all', _('Todas')], ['document', _('Documents')], ['link', _('Links')], ['audio', _('Audio')], ['video', _('Video')], ['note', _('Notas')]].map(([k, l]) =>
     h('button', {class:filters.refsType === k ? 'on' : '', onclick:() => { filters.refsType = k; renderAll(); }}, l)));
-  page.append(h('div', {class:'page-head'}, h('h1', null, _('Referências')), seg, h('span', {class:'spacer'}),
-    h('button', {class:'btn', onclick:() => { const r = newNote(); commit(); openRefFicha(r.id); }}, _('+ Nova Nota')),
-    h('button', {class:'btn primary', onclick:() => newRefDialog(null)}, _('+ Nova Referência'))));
-  const list = state.refs.filter(r => filters.refsType === 'all' || r.type === filters.refsType).sort((a, b) => (b.created || 0) - (a.created || 0));
-  const grid = h('div', {class:'grid'});
-  list.forEach(r => grid.append(h('div', {class:'card', onclick:() => openRefFicha(r.id)}, h('div', {class:'kicker'}, REF_ICON[r.type] + ' ' + REF_TYPES[r.type]), h('h3', null, r.title || _('Sem título')),
-    h('div', {class:'muted small', style:{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}, r.type === 'note' ? (r.text || _('Nota em branco')) : httpURL(r.url) ? h('a', {href:r.url, target:'_blank', rel:'noopener noreferrer', class:'ext-link', onclick:e => e.stopPropagation()}, r.url + ' ↗') : r.url ? r.url : `${r.fileName} · ${fmtSize(r.size)}`),
-    h('div', {class:'muted small', style:{marginTop:'6px'}}, r.links.length ? _n(r.links.length, '{n} associação', '{n} associações') : _('Sem associações')))));
-  page.append(list.length ? grid : h('div', {class:'empty'}, _('Sem Referências. Todas as Referências são guardadas localmente neste browser.')));
+  const list = () => state.refs.filter(r => filters.refsType === 'all' || r.type === filters.refsType).sort((a, b) => (b.created || 0) - (a.created || 0));
+  const what = r => r.type === 'note' ? (r.text || _('Nota em branco')) : r.url ? r.url : `${r.fileName} · ${fmtSize(r.size)}`;
+  listPage(page, 'refs', _('Referências'), [seg],
+    [importBtn('refs'), h('button', {class:'btn primary ref-new', 'aria-haspopup':'menu', 'aria-expanded':'false', onclick:e => topMenu(e.currentTarget, [ // um só «+ Novo»: uma Nota já aberta, ou a janela de ficheiros e Links
+      {label:_('Nota'), action:() => { const r = newNote(); commit(); openRefFicha(r.id); }}, {label:_('Ficheiro ou Link…'), action:() => newRefDialog(null)}], 'ref-new-menu')}, _('+ Novo'))],
+    [['new', _('Ordenar: mais recentes')], SORT_NAME],
+    () => list().map(r => { const links = r.links.length ? _n(r.links.length, '{n} associação', '{n} associações') : _('Sem associações');
+      return {name:r.title || _('Sem título'), open:() => openRefFicha(r.id), lead:refIcon(r.type), meta:REF_TYPES[r.type] + ' · ' + what(r).slice(0, 120), side:links,
+        card:() => h('div', {class:'card', onclick:() => openRefFicha(r.id)}, h('div', {class:'kicker'}, refIcon(r.type), REF_TYPES[r.type]), h('h3', null, r.title || _('Sem título')),
+          h('div', {class:'muted small', style:{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}, r.type === 'note' ? (r.text || _('Nota em branco')) : httpURL(r.url) ? h('a', {href:r.url, target:'_blank', rel:'noopener noreferrer', class:'ext-link', onclick:e => e.stopPropagation()}, r.url + ' ↗') : r.url ? r.url : `${r.fileName} · ${fmtSize(r.size)}`),
+          h('div', {class:'muted small', style:{marginTop:'6px'}}, links))}; }),
+    () => _('Sem Referências. Todas as Referências são guardadas localmente neste browser.'));
 }
 /* pesquisa sem distinguir acentos nem maiúsculas */
 const supNorm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const supHay = it => it._h || (it._h = [supNorm(it.n + ' ' + (it.a || '')), supNorm([it.d, it.f, it.u, it.c, it.t, ...(it.x || []), ...(it.w || []).map(r => r.join(' '))].filter(Boolean).join(' ').replace(/\*([^*\s][^*]*?)\*/g, '$1'))]);
+const supHay = it => it._h || (it._h = [supNorm(it.n + ' ' + (it.o || '') + ' ' + (it.a || '')), supNorm([it.d, it.f, it.u, it.c, it.t, ...(it.x || []), ...(it.w || []).map(r => r.join(' '))].filter(Boolean).join(' ').replace(/\*([^*\s][^*]*?)\*/g, '$1'))]);
 function supportSearch(q){
   const words = supNorm(q).split(/\s+/).filter(Boolean), out = [];
   SUPPORT.forEach(sec => sec.groups.forEach(g => g.items.forEach(it => { const [head, rest] = supHay(it);
@@ -157,7 +244,7 @@ function supportSearch(q){
 }
 function pageSupport(page){
   const body = h('div');
-  const card = (it, kicker) => h('div', {class:'card', onclick:() => openSupportFicha(it.n, filters.supQ.trim())}, h('div', {class:'kicker'}, kicker), h('h3', null, it.n),
+  const card = (it, kicker) => h('div', {class:'card', onclick:() => openSupportFicha(it.n, filters.supQ.trim())}, h('div', {class:'kicker'}, kicker), h('h3', null, supTitle(it)),
     it.a && h('div', {class:'small sup-alt'}, it.a), h('div', {class:'muted small sup-desc'}, supRich(it.d)));
   const nav = h('div', {class:'sup-nav'}, SUPPORT.map(sec => h('button', {dataset:{sec:sec.key}, onclick:() => { filters.supSec = sec.key; filters.supQ = search.value = ''; draw(); }},
     sec.name, h('span', {class:'n'}, sec.groups.reduce((n, g) => n + g.items.length, 0)))));
@@ -183,7 +270,7 @@ function pageSettings(page, inDrawer){
       h('div', {class:'sw'}, ['--bg', '--surface2', '--border', '--accent', '--text'].map(k => h('span', {style:{background:v[k]}}))), h('div', {class:'small'}, pal.name)); };
   const pals = [...PRESET_PALETTES, ...extraPalettes]; // uma paleta gerada numa sessão anterior continua a aparecer, como «Atual»
   if (!pals.some(x => x.h === p.h && x.mode === effectiveMode())) pals.push({name:_('Atual'), h:p.h, mode:effectiveMode()});
-  page.append(h('div', {class:'settings'},
+  const set = h('div', {class:'settings'},
     inDrawer ? installCard() : h('div', {class:'page-head'}, h('h1', null, _('Definições do Projeto'))), // no telemóvel, instalar como app vem primeiro
     h('div', {class:'card static'}, field(_('Nome do Projeto'), h('input', {class:'inp', value:state.project.name, oninput:e => { state.project.name = e.target.value || _('Projeto'); save(); $('#projName').textContent = state.project.name; document.title = state.project.name + ' — Narrative'; }}))),
     langCard(),
@@ -211,7 +298,23 @@ function pageSettings(page, inDrawer){
     h('div', {class:'card static'}, h('h3', null, _('Visita guiada')),
       h('p', {class:'muted small'}, _('A visita usa um projeto de demonstração e não altera nem regista nada nos seus dados.')),
       h('div', {class:'chips'}, h('button', {class:'btn', onclick:() => startTour()}, _('Visita guiada')), h('button', {class:'btn', onclick:() => startTour('deep')}, _('Visita detalhada')))),
-    privacyCard()));
+    privacyCard());
+  page.append(inDrawer ? set : h('div', {class:'set-layout'}, settingsToc(set, page), set));
+}
+/* índice das Definições: salta para cada cartão e assinala o que está à vista (só com largura para ele) */
+function settingsToc(set, page){
+  const items = [...set.querySelectorAll(':scope > .card')].map((c, i) => {
+    const t = c.querySelector('h3') || c.querySelector('.field > label'); if (!t) return null;
+    c.id = 'set-' + i; return {c, b:h('button', {type:'button', onclick:() => { c.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('reduce-motion') ? 'auto' : 'smooth', block:'start'}); }}, t.textContent.trim())};
+  }).filter(Boolean);
+  const nav = h('nav', {class:'set-toc', 'aria-label':_('Secções das Definições')}, items.map(x => x.b));
+  const mark = () => { const top = page.getBoundingClientRect().top + 90; let on = items[0];
+    for (const x of items) if (x.c.getBoundingClientRect().top <= top) on = x;
+    if (page.scrollTop + page.clientHeight >= page.scrollHeight - 4) on = items[items.length - 1]; // no fim da página, o último cartão
+    items.forEach(x => { x.b.classList.toggle('on', x === on); x.b.setAttribute('aria-current', x === on ? 'true' : 'false'); }); };
+  if (page._setMark) page.removeEventListener('scroll', page._setMark);
+  page._setMark = mark; page.addEventListener('scroll', mark, {passive:true}); requestAnimationFrame(mark);
+  return nav;
 }
 
 /* Abrir um ficheiro por cima de um projeto aberto substitui-o: nenhuma janela pode anular para trás desse ponto. */

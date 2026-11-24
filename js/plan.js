@@ -96,6 +96,10 @@ function setStage(sid, k, val){
 }
 function setSceneDue(sid, k, v){ const s = state.scenes[sid]; if (!s) return; editStage(s, p => { p[k].due = DATE_RE.test(v) ? v : null; }); commit(); redrawTop(); }
 
+/* o prazo em atraso de uma Cena (o da escrita, se ainda não está escrita; senão, o da revisão), ou null */
+function sceneLate(s){ const t = todayISO(); for (const k of ['write', 'review']){ const p = stg(s, k); if (!p.done){ return p.due && p.due < t ? {k, due:p.due} : null; } } return null; }
+const lateMark = s => { const l = sceneLate(s); return l ? h('span', {class:'late-mark', role:'img', 'aria-label':_('Prazo em atraso'), dataset:{tip:(l.k === 'write' ? _('Prazo de escrita em atraso: {data}.', {data:fmtDate(l.due)}) : _('Prazo de revisão em atraso: {data}.', {data:fmtDate(l.due)}))}}, svgIcon('clock')) : null; };
+
 /* ---------- barra em camadas dos Books e Chapters ---------- */
 /* Pesquisa por baixo (só se houver objetivos ligados ao Book ou ao Chapter, ou às suas Scenes), Escrita por cima, Revisão por cima de tudo */
 function layerProg(kind, obj){
@@ -179,9 +183,9 @@ function openGoalFicha(id, isNew){
       field(_('Notas'), h('textarea', {class:'inp', value:g.notes, placeholder:_('O que procurar, onde, com quem, o que se quer saber…'), oninput:e => { g.notes = e.target.value; save(); }})),
       ev ? field(_('Calendário'), calLinks(ev)) : null,
       refsSection('goal', id, draw),
-      h('div', {class:'modal-foot'}, h('button', {class:'btn danger', onclick:async () => {
-        if (await confirmDialog(_('Eliminar o objetivo «{nome}»? As Referências associadas mantêm-se.', {nome:g.title || _('Sem título')}), {title:_('Eliminar objetivo'), ok:_('Eliminar')})){
-          state.goals = state.goals.filter(x => x.id !== id); state.refs.forEach(r => { r.links = r.links.filter(l => !(l.kind === 'goal' && l.id === id)); }); closeFicha(m); commit(); } }}, _('Eliminar objetivo')),
+      h('div', {class:'modal-foot'}, h('button', {class:'btn danger', onclick:() => { const nome = g.title || _('Sem título');
+          state.goals = state.goals.filter(x => x.id !== id); state.refs.forEach(r => { r.links = r.links.filter(l => !(l.kind === 'goal' && l.id === id)); }); closeFicha(m); commit();
+          snack(_('Objetivo «{nome}» eliminado. As Referências associadas mantêm-se.', {nome})); }}, _('Eliminar objetivo')),
         h('button', {class:'btn primary', onclick:() => m.close()}, _('Fechar'))));
   };
   m.redraw = draw; draw();
@@ -281,32 +285,91 @@ function calLinks(e){
 }
 
 /* ---------- o separador ---------- */
-const PLAN_VIEWS = [['overview', _('Visão global')], ['research', _('Pesquisa e Planeamento')], ['write', _('Escrita')], ['review', _('Revisão')], ['calendar', _('Calendário')]];
+const PLAN_VIEWS = [['overview', _('Visão global')], ['research', _('Pesquisa e Planeamento')], ['progress', _('Escrita e Revisão')], ['calendar', _('Calendário')]];
 function pagePlan(page){
+  if (filters.planView === 'write' || filters.planView === 'review') filters.planView = 'progress'; // as duas listas são agora uma só
   if (!PLAN_VIEWS.some(v => v[0] === filters.planView)) filters.planView = 'overview';
   const v = filters.planView;
   page.append(h('div', {class:'page-head'}, h('h1', null, _('Calendarização e Objetivos')), h('span', {class:'spacer'}),
     h('button', {class:'btn', onclick:exportICS}, _('Exportar calendário (.ics)'))));
   page.append(h('div', {class:'seg plan-nav', role:'tablist'}, PLAN_VIEWS.map(([k, l]) => h('button', {class:k === v ? 'on' : '', role:'tab', 'aria-selected':String(k === v), onclick:() => { filters.planView = k; renderAll(); }}, l))));
   const box = h('div', {class:'plan-view'}); page.append(box);
-  ({overview:planOverview, research:planResearch, write:b => planStage(b, 'write'), review:b => planStage(b, 'review'), calendar:planCalendar})[v](box);
+  ({overview:planOverview, research:planResearch, progress:planProgress, calendar:planCalendar})[v](box);
+}
+/* três anéis, de fora para dentro: Pesquisa, Escrita e Revisão — a mesma ordem das barras em camadas dos Tomos */
+function progRings(r, w, v, pct){
+  const ring = (cls, rad, p) => { const c = 2 * Math.PI * rad, len = Math.max(0, Math.min(1, p / 100)) * c;
+    return `<circle class="ring-bg" cx="60" cy="60" r="${rad}"/>` + (len ? `<circle class="ring ${cls}" cx="60" cy="60" r="${rad}" stroke-dasharray="${len.toFixed(1)} ${(c - len).toFixed(1)}" transform="rotate(-90 60 60)"/>` : ''); };
+  return h('div', {class:'rings', role:'img', 'aria-label':_('Pesquisa {r}%, Escrita {w}%, Revisão {v}%', {r:r.pct, w:w.pct, v:v.pct}),
+    innerHTML:`<svg viewBox="0 0 120 120">${ring('ring-r', 52, r.pct)}${ring('ring-w', 40, w.pct)}${ring('ring-v', 28, v.pct)}<text x="60" y="65" text-anchor="middle">${pct}%</text></svg>`});
+}
+/* as fases numa linha do tempo: uma barra por fase sobre os meses, a marca de hoje e os prazos como pontos.
+   Arrastar as pontas de uma barra muda as datas (os campos por baixo fazem o mesmo, também pelo teclado). */
+function phaseTimeline(){
+  const PH = [['research', _('Pesquisa e Planeamento'), 'goal'], ['write', _('Escrita'), 'write'], ['review', _('Revisão'), 'review']];
+  const ds = []; PH.forEach(([k]) => { const f = phaseOf(k); if (f.start) ds.push(f.start); if (f.end) ds.push(f.end); });
+  if (!ds.length) return null;
+  const t = todayISO(), DAY = 864e5, D = iso => new Date(iso + 'T12:00').getTime();
+  const A = new Date(Math.min(...ds.map(D), D(t))); A.setDate(1); A.setHours(0, 0, 0, 0);
+  const Z2 = new Date(Math.max(...ds.map(D), D(t))); Z2.setMonth(Z2.getMonth() + 1, 1); Z2.setHours(0, 0, 0, 0);
+  const a = A.getTime(), span = Z2.getTime() - a, pct = iso => Math.max(0, Math.min(100, (D(iso) - a) / span * 100));
+  const months = []; for (let d = new Date(A); d < Z2; d.setMonth(d.getMonth() + 1)) months.push(new Date(d));
+  const every = Math.ceil(months.length / 12);
+  const el = h('div', {class:'tl', role:'group', 'aria-label':_('Linha do tempo das fases')});
+  el.append(h('div', {class:'tl-months', 'aria-hidden':'true'}, months.map((m, i) => h('span', {style:{left:((m.getTime() - a) / span * 100) + '%'}}, i % every ? '' : m.toLocaleDateString(LOCALE, months.length > 12 ? {month:'short', year:'2-digit'} : {month:'short'}).replace('.', '')))));
+  const rows = h('div', {class:'tl-rows'}); el.append(rows);
+  PH.forEach(([k, name, kind]) => { const f = phaseOf(k), row = h('div', {class:'tl-row'});
+    if (f.start && f.end && f.end >= f.start){
+      const bar = h('div', {class:'tl-bar ev-' + kind, dataset:{phase:k, tip:name + ': ' + fmtDate(f.start) + ' – ' + fmtDate(f.end)}, style:{left:pct(f.start) + '%', width:Math.max(.6, pct(f.end) - pct(f.start)) + '%'}}, h('span', {class:'tl-name'}, name));
+      const grip = side => { const g = h('span', {class:'tl-h ' + side, 'aria-hidden':'true'});
+        g.addEventListener('pointerdown', e => { if (e.button) return; e.preventDefault(); try { g.setPointerCapture(e.pointerId); } catch(x){}
+          const box = rows.getBoundingClientRect(); let iso = side === 's' ? f.start : f.end;
+          const mv = ev => { const fr = Math.max(0, Math.min(1, (ev.clientX - box.left) / box.width)); iso = isoLocal(new Date(a + fr * span));
+            if (side === 's' && iso > f.end) iso = f.end; if (side === 'e' && iso < f.start) iso = f.start;
+            const s = side === 's' ? iso : f.start, e2 = side === 'e' ? iso : f.end; bar.style.left = pct(s) + '%'; bar.style.width = Math.max(.6, pct(e2) - pct(s)) + '%'; bar.dataset.tip = name + ': ' + fmtDate(s) + ' – ' + fmtDate(e2); };
+          const up = () => { g.removeEventListener('pointermove', mv); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); if (iso !== (side === 's' ? f.start : f.end)) setPhase(k, side === 's' ? 'start' : 'end', iso); };
+          g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up); });
+        return g; };
+      bar.prepend(grip('s')); bar.append(grip('e')); row.append(bar);
+    } else if (f.start || f.end){ const iso = f.start || f.end;
+      row.append(h('div', {class:'tl-tick ev-' + kind, dataset:{tip:name + ': ' + (f.start ? _('Início') : _('Fim')) + ' ' + fmtDate(iso)}, style:{left:pct(iso) + '%'}}, h('span', {class:'tl-name'}, name)));
+    } else row.append(h('span', {class:'tl-none muted small'}, name + ' · ' + _('Sem datas')));
+    rows.append(row); });
+  const dots = h('div', {class:'tl-dots'});
+  planEvents().forEach(e => { if (e.kind === 'phase' || e.empty) return; const x = D(e.date); if (x < a || x > a + span) return;
+    dots.append(h('span', {class:'ev-dot ev-' + e.kind + (e.done ? ' done' : ''), dataset:{tip:e.title + ' · ' + fmtDate(e.date)}, style:{left:pct(e.date) + '%'}})); });
+  rows.append(dots, h('div', {class:'tl-now', style:{left:pct(t) + '%'}}, h('span', null, _('Hoje'))));
+  return el;
 }
 function planOverview(box){
   const o = overallProg(), r = researchProg(), w = projectProg('write'), rv = projectProg('review');
-  const row = (label, p, unit, view) => h('div', {class:'prog-row click', onclick:() => { filters.planView = view; renderAll(); }},
-    h('span', {class:'prog-name'}, label), progBar(p), h('span', {class:'muted small prog-num'}, progLabel(p, unit)));
+  const row = (label, p, unit, view, kind) => h('div', {class:'prog-row click', onclick:() => { filters.planView = view; renderAll(); }},
+    h('span', {class:'prog-name'}, h('span', {class:'ev-dot ev-' + kind, 'aria-hidden':'true'}), label), progBar(p), h('span', {class:'muted small prog-num'}, progLabel(p, unit)));
   const PH = [['research', _('Pesquisa e Planeamento')], ['write', _('Escrita')], ['review', _('Revisão')]], t = todayISO();
   const phaseState = (k, f) => { const p = k === 'research' ? r : k === 'write' ? w : rv;
     if (p.complete) return badge(_('Concluída'), 'ok'); if (f.end && f.end < t) return badge(_('Em atraso'), 'late'); if (f.start && f.start <= t) return badge(_('Em curso'), 'main');
     return f.start ? badge(_('Por começar')) : badge(_('Sem datas')); };
   const ev = planEvents(), late = ev.filter(e => !e.done && !e.empty && e.kind !== 'phase' && e.date < t), next = ev.filter(e => !e.done && e.date >= t).slice(0, 8);
   const evRow = e => h('div', {class:'list-row' + (e.open ? ' click' : ''), onclick:e.open || null, role:e.open ? 'button' : null, tabIndex:e.open ? 0 : null, onkeydown:e.open ? (k => { if (k.key === 'Enter') e.open(); }) : null}, h('span', {class:'ev-dot ev-' + e.kind, 'aria-hidden':'true'}), h('span', {class:'grow'}, e.title), h('span', {class:'muted small'}, fmtDate(e.date) + (e.time ? ' ' + e.time : '')));
+  /* «a seguir»: a próxima Cena a escrever e a rever, o próximo prazo e o próximo objetivo de pesquisa — cada cartão leva lá */
+  const fr = frontiers(), sceneOf = k => { const f = fr.find(x => x.k === k); return f && state.scenes[f.id]; }, nw = sceneOf('write'), nr = sceneOf('review');
+  const where = s => { const p = findScenePos(s.id); return p ? p.book.name + ' › ' + p.chapter.name : ''; };
+  const goalNext = (state.goals || []).filter(g => !g.done).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'))[0], dl = ev.find(e => !e.done && !e.empty && e.kind !== 'phase' && e.kind !== 'goal');
+  const nextCard = (k, kicker, title, sub, fn, late2) => h('button', {class:'next-card' + (late2 ? ' late' : ''), dataset:{next:k}, onclick:fn}, h('span', {class:'kicker'}, kicker), h('b', null, title), h('span', {class:'muted small'}, sub));
+  const nexts = [
+    nw ? nextCard('write', _('A seguir: escrever'), nw.title || _('Sem título'), where(nw), () => openSceneFicha(nw.id)) : null,
+    nr ? nextCard('review', _('A seguir: rever'), nr.title || _('Sem título'), where(nr), () => openSceneFicha(nr.id)) : null,
+    dl ? nextCard('due', dl.date < t ? _('Prazo em atraso') : _('Próximo prazo'), dl.title, fmtDate(dl.date), dl.open, dl.date < t) : null,
+    goalNext ? nextCard('goal', _('A seguir: pesquisar'), goalNext.title || _('Sem título'), goalNext.due ? fmtDate(goalNext.due) + (goalNext.time ? ' ' + goalNext.time : '') : _('Sem data'), () => openGoalFicha(goalNext.id), goalNext.due && goalNext.due < t) : null].filter(Boolean);
   add(box,
+    nexts.length ? h('div', {class:'next-cards'}, nexts) : null,
     h('div', {class:'card static'}, h('h3', null, _('Progresso do projeto')),
-      h('div', {class:'big-pct'}, o.pct + '%', h('span', {class:'muted small'}, ' ' + _('concluído · {done} de {total} etapas', {done:o.done, total:o.total}))),
-      row(_('Pesquisa e Planeamento'), r, _('objetivos'), 'research'), row(_('Escrita'), w, _('Cenas'), 'write'), row(_('Revisão'), rv, _('Cenas'), 'review')),
+      h('div', {class:'prog-top'}, progRings(r, w, rv, o.pct),
+        h('div', {class:'prog-side'}, h('div', {class:'big-pct'}, o.pct + '%', h('span', {class:'muted small'}, ' ' + _('concluído · {done} de {total} etapas', {done:o.done, total:o.total}))),
+          row(_('Pesquisa e Planeamento'), r, _('objetivos'), 'research', 'goal'), row(_('Escrita'), w, _('Cenas'), 'progress', 'write'), row(_('Revisão'), rv, _('Cenas'), 'progress', 'review')))),
     h('div', {class:'card static'}, h('h3', null, _('Fases')),
       h('p', {class:'muted small'}, _('Defina o início e o fim de cada fase. As fases podem sobrepor-se: pode continuar a pesquisar enquanto escreve.')),
+      phaseTimeline(),
       PH.map(([k, l]) => h('div', {class:'phase-row'}, h('b', {class:'phase-name'}, l),
         h('label', {class:'small muted'}, _('Início') + ' ', dueInput(phaseOf(k).start, val => setPhase(k, 'start', val), _('Início: {fase}', {fase:l}))),
         h('label', {class:'small muted'}, _('Fim') + ' ', dueInput(phaseOf(k).end, val => setPhase(k, 'end', val), _('Fim: {fase}', {fase:l}))),
@@ -316,33 +379,59 @@ function planOverview(box){
         layerBar('book', b, 'big') || h('div', {class:'muted small'}, _('Sem Cenas nem objetivos.')), h('div', {class:'muted small'}, layerText(layerProg('book', b))),
         b.chapters.map((c, ci) => h('div', {class:'ch-prog'}, h('span', {class:'small ch-prog-name'}, (ci + 1) + '. ' + c.name), layerBar('chapter', c) || h('span', {class:'muted small'}, _('Sem Cenas')))))) ),
     late.length ? h('div', {class:'card static'}, h('h3', null, _('Em atraso')), late.map(evRow)) : null,
-    h('div', {class:'card static'}, h('h3', null, _('Próximos prazos')), next.length ? next.map(evRow) : h('div', {class:'muted small'}, _('Sem prazos marcados. Defina-os em Escrita, Revisão, Pesquisa ou nas fichas.'))));
+    h('div', {class:'card static'}, h('h3', null, _('Próximos prazos')), next.length ? next.map(evRow) : h('div', {class:'muted small'}, _('Sem prazos marcados. Defina-os em Escrita e Revisão, em Pesquisa ou nas fichas.'))));
 }
-function planStage(box, k){
+/* o prazo só ocupa espaço quando existe («12 mar»); sem prazo, um «+ prazo» discreto que aparece ao passar o rato */
+const shortDate = iso => new Date(iso + 'T12:00').toLocaleDateString(LOCALE, iso.slice(0, 4) === todayISO().slice(0, 4) ? {day:'numeric', month:'short'} : {day:'numeric', month:'short', year:'2-digit'}).replace('.', '');
+function dueChip(value, onset, label, done){
+  const late = value && !done && value < todayISO(), wrap = h('span', {class:'due-w'});
+  const edit = () => { const inp = dueInput(value, onset, label, done); wrap.replaceChildren(inp); inp.focus(); try { inp.showPicker && inp.showPicker(); } catch(e){}
+    inp.addEventListener('blur', () => setTimeout(() => { if (inp.isConnected && document.activeElement !== inp) show(); }, 200)); };
+  const show = () => wrap.replaceChildren(value
+    ? h('button', {class:'due-chip' + (late ? ' late' : '') + (done ? ' done' : ''), 'aria-label':label + ': ' + fmtDate(value) + (late ? ' (' + _('Em atraso') + ')' : ''), onclick:edit}, svgIcon('plan'), shortDate(value))
+    : h('button', {class:'due-add', 'aria-label':label, onclick:edit}, _('+ prazo')));
+  show(); return wrap;
+}
+/* Escrita e Revisão numa só lista: cada Cena tem as duas marcas lado a lado; Tomos e Capítulos, as duas barras e os dois prazos */
+function planProgress(box){
   if (!allScenes().length) return add(box, h('div', {class:'empty'}, _('Ainda não há Cenas. Crie-as no quadro (separador Narrativa).')));
-  add(box, h('p', {class:'muted small'}, k === 'write'
-    ? _('Marque cada Cena quando estiver escrita. Um Capítulo fica completo quando todas as suas Cenas estão; um Tomo, quando todos os seus Capítulos estão. Desmarcar uma Cena (para a reescrever) desmarca também a revisão.')
-    : _('Marque cada Cena quando estiver revista (só depois de escrita). Desmarque para a rever outra vez.')));
+  add(box, h('p', {class:'muted small'}, _('Marque cada Cena quando estiver escrita e, depois, quando estiver revista. Um Capítulo fica completo quando todas as suas Cenas estão; um Tomo, quando todos os seus Capítulos estão. Desmarcar a escrita de uma Cena (para a reescrever) desmarca também a revisão. Os prazos são opcionais: «+ prazo» aparece ao passar o rato.')));
+  const KS = Object.keys(STAGES);
+  const dueLabel = (k, what, nome) => k === 'write' ? _('Prazo de escrita: {x} {nome}', {x:what, nome}) : _('Prazo de revisão: {x} {nome}', {x:what, nome});
+  const cell = (k, prog, obj, what, nome, sm) => h('span', {class:'st-cell st-' + k}, progBar(prog, sm ? 'sm' : ''), h('span', {class:'muted small st-n'}, prog.done + '/' + prog.total), dueChip(dueOf(obj, k), val => setDue(obj, k, val), dueLabel(k, what, nome), prog.complete));
   state.books.forEach(b => {
-    const bp = bookProg(b, k);
+    const done = KS.every(k => bookProg(b, k).complete);
     const bookEl = h('div', {class:'card static stage-book'},
-      h('div', {class:'stage-head'}, bookDot(b), h('b', {class:'grow click', onclick:() => openBookFicha(b.id)}, b.name), bp.complete ? badge(_('Completo'), 'ok') : null,
-        progBar(bp), h('span', {class:'muted small prog-num'}, progLabel(bp, _('Cenas'))), dueInput(dueOf(b, k), val => setDue(b, k, val), (k === 'write' ? _('Prazo de escrita do Tomo {nome}', {nome:b.name}) : _('Prazo de revisão do Tomo {nome}', {nome:b.name})), bp.complete)));
+      h('div', {class:'st-row st-cols', 'aria-hidden':'true'}, h('span'), ...KS.map(k => h('span', {class:'st-cell st-col st-' + k}, h('span', {class:'ev-dot ev-' + k}), STAGES[k]))),
+      h('div', {class:'st-row stage-head'}, h('span', {class:'st-main'}, bookDot(b), h('b', {class:'click', onclick:() => openBookFicha(b.id)}, b.name), done ? badge(_('Completo'), 'ok') : null),
+        ...KS.map(k => cell(k, bookProg(b, k), b, _('Tomo'), b.name))));
     b.chapters.forEach((c, ci) => {
-      const cp = chapterProg(c, k);
+      const cdone = KS.every(k => chapterProg(c, k).complete);
       bookEl.append(h('div', {class:'stage-ch'},
-        h('div', {class:'stage-head'}, h('span', {class:'ch-num-s'}, ci + 1), h('span', {class:'grow'}, c.name), cp.complete ? badge(_('Completo'), 'ok') : null,
-          progBar(cp, 'sm'), h('span', {class:'muted small prog-num'}, progLabel(cp, _('Cenas'))), dueInput(dueOf(c, k), val => setDue(c, k, val), (k === 'write' ? _('Prazo de escrita do Capítulo {nome}', {nome:c.name}) : _('Prazo de revisão do Capítulo {nome}', {nome:c.name})), cp.complete)),
-        chapterScenes(c).map(s => { const p = stg(s, k), arc = arcById(s.arcId);
-          return h('div', {class:'list-row stage-scene' + (p.done ? ' done' : '')}, stageCheck(s, k),
-            h('span', {class:'dot', style:{background:arcStroke(arc)}}), h('span', {class:'grow click', onclick:() => openSceneFicha(s.id)}, s.title || _('Sem título')),
-            p.done && p.at ? h('span', {class:'muted small'}, fmtDate(isoLocal(new Date(p.at)))) : null,
-            dueInput(p.due, val => setSceneDue(s.id, k, val), (k === 'write' ? _('Prazo de escrita da Cena {nome}', {nome:s.title || _('Sem título')}) : _('Prazo de revisão da Cena {nome}', {nome:s.title || _('Sem título')})), p.done)); }),
+        h('div', {class:'st-row stage-head'}, h('span', {class:'st-main'}, h('span', {class:'ch-num-s'}, ci + 1), h('span', null, c.name), cdone ? badge(_('Completo'), 'ok') : null),
+          ...KS.map(k => cell(k, chapterProg(c, k), c, _('Capítulo'), c.name, true))),
+        chapterScenes(c).map(s => { const arc = arcById(s.arcId), nome = s.title || _('Sem título');
+          return h('div', {class:'st-row list-row stage-scene' + (isDone(s, 'review') ? ' done' : '')},
+            h('span', {class:'st-main'}, h('span', {class:'dot', style:{background:arcStroke(arc)}}), h('span', {class:'grow click', onclick:() => openSceneFicha(s.id)}, nome)),
+            ...KS.map(k => { const p = stg(s, k); return h('span', {class:'st-cell st-' + k}, stageCheck(s, k),
+              dueChip(p.due, val => setSceneDue(s.id, k, val), dueLabel(k, _('Cena'), nome), p.done)); })); }),
         c.scenes.length ? null : h('div', {class:'muted small'}, _('Capítulo sem Cenas.'))));
     });
     box.append(bookEl);
   });
 }
+/* mudar a data de um evento do calendário (arrastando-o para outro dia): cada tipo guarda a data no seu sítio */
+function moveEvent(key, iso){
+  if (!DATE_RE.test(iso)) return false; let m;
+  if ((m = /^goal-(.+)$/.exec(key))){ const g = goalById(m[1]); if (!g || g.due === iso) return false; g.due = iso; commit(); }
+  else if ((m = /^(book|chapter|scene)-(write|review)-(.+)$/.exec(key))){
+    if (m[1] === 'scene'){ if (!state.scenes[m[3]]) return false; setSceneDue(m[3], m[2], iso); }
+    else { const o = m[1] === 'book' ? bookById(m[3]) : (findChapter(m[3]) || {}).chapter; if (!o) return false; setDue(o, m[2], iso); } }
+  else if ((m = /^phase-(research|write|review)-(start|end)$/.exec(key))) setPhase(m[1], m[2], iso);
+  else return false;
+  snack(_('Data alterada para {data}.', {data:fmtDate(iso)})); return true;
+}
+function createGoalOn(iso){ const g = newGoal(); g.due = iso; commit(); openGoalFicha(g.id, true); return g; }
 function planResearch(box){
   const f = filters.goalFilter || 'all', goals = (state.goals || []).filter(g => f === 'all' || (f === 'open' ? !g.done : g.done));
   const r = researchProg();
@@ -353,6 +442,7 @@ function planResearch(box){
     goals.length ? h('div', {class:'card static'}, goals.slice().sort((a, b) => (a.done - b.done) || (a.due || '9999').localeCompare(b.due || '9999')).map(goalRow))
       : h('div', {class:'empty'}, f === 'all' ? _('Ainda não há objetivos de pesquisa.') : _('Nenhum objetivo neste filtro.')));
 }
+let calDragKey = null; // o evento que está a ser arrastado para outro dia
 function planCalendar(box){
   const t = todayISO(); if (!filters.calMonth) filters.calMonth = t.slice(0, 7);
   const [y, mo] = filters.calMonth.split('-').map(Number), first = new Date(y, mo - 1, 1), days = new Date(y, mo, 0).getDate();
@@ -361,28 +451,48 @@ function planCalendar(box){
   const shift = n => { const d = new Date(y, mo - 1 + n, 1); filters.calMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); filters.calDay = null; renderAll(); };
   if (filters.calDay && filters.calDay.slice(0, 7) !== month) filters.calDay = null;
   const shown = filters.calDay ? inMonth.filter(e => e.date === filters.calDay) : inMonth;
-  const grid = h('div', {class:'cal-grid'}, [0, 1, 2, 3, 4, 5, 6].map(i => h('div', {class:'cal-dow'}, new Date(2024, 0, 1 + i).toLocaleDateString(LOCALE, {weekday:'short'}).replace('.', ''))));
+  const grid = h('div', {class:'cal-grid'}, [0, 1, 2, 3, 4, 5, 6].map(i => { // no ecrã estreito, só as três primeiras letras: «SEGUNDA» já não se parte a meio
+    const dt = new Date(2024, 0, 1 + i), w = dt.toLocaleDateString(LOCALE, {weekday:'short'}).replace('.', '');
+    return h('div', {class:'cal-dow', title:dt.toLocaleDateString(LOCALE, {weekday:'long'})}, h('span', {class:'dow-l'}, w), h('span', {class:'dow-s'}, w.slice(0, 3))); }));
   for (let i = 0; i < lead; i++) grid.append(h('div', {class:'cal-day empty'}));
   for (let d = 1; d <= days; d++){
     const iso = month + '-' + String(d).padStart(2, '0'), list = inMonth.filter(e => e.date === iso);
-    grid.append(h('div', {class:'cal-day' + (iso === t ? ' today' : '') + (iso === filters.calDay ? ' sel' : '') + (list.length ? ' has' : ''),
-      onclick:list.length ? (e => { if (e.target.closest('.cal-ev') && innerWidth > 640) return; filters.calDay = filters.calDay === iso ? null : iso; renderAll(); }) : null}, h('div', {class:'cal-num'}, d),
-      list.slice(0, 3).map(e => h('button', {class:'cal-ev ev-' + e.kind + (e.done ? ' done' : ''), title:e.title + (e.time ? ' · ' + e.time : ''), onclick:ev2 => { if (innerWidth <= 640) return; ev2.stopPropagation(); e.open && e.open(); }}, e.title)),
+    /* clicar num dia escolhe-o (por baixo ficam os seus eventos e o botão para criar um objetivo nesse dia); o «+» cria-o logo;
+       arrastar um evento para outro dia muda-lhe a data */
+    grid.append(h('div', {class:'cal-day' + (iso === t ? ' today' : '') + (iso === filters.calDay ? ' sel' : '') + (list.length ? ' has' : ''), dataset:{day:iso},
+      onclick:e => { if (e.target.closest('.cal-add') || (e.target.closest('.cal-ev') && innerWidth > 640)) return; filters.calDay = filters.calDay === iso ? null : iso; renderAll(); },
+      ondragover:e => { if (calDragKey){ e.preventDefault(); e.currentTarget.classList.add('drop'); } }, ondragleave:e => e.currentTarget.classList.remove('drop'),
+      ondrop:e => { e.preventDefault(); e.currentTarget.classList.remove('drop'); const k = calDragKey; calDragKey = null; if (k) moveEvent(k, iso); }},
+      h('div', {class:'cal-top'}, h('span', {class:'cal-num'}, d), h('button', {class:'cal-add', 'aria-label':_('Novo objetivo de pesquisa a {data}', {data:fmtDate(iso)}), onclick:() => createGoalOn(iso)}, svgIcon('plus'))),
+      list.slice(0, 3).map(e => h('button', {class:'cal-ev ev-' + e.kind + (e.done ? ' done' : ''), title:e.title + (e.time ? ' · ' + e.time : ''), draggable:true,
+        ondragstart:ev2 => { calDragKey = e.key; try { ev2.dataTransfer.setData('text/plain', e.title); ev2.dataTransfer.effectAllowed = 'move'; } catch(x){} }, ondragend:() => { calDragKey = null; },
+        onclick:ev2 => { if (innerWidth <= 640) return; ev2.stopPropagation(); e.open && e.open(); }}, e.title)),
       list.length > 3 ? h('div', {class:'muted small'}, '+' + (list.length - 3)) : null));
   }
+  /* Agenda: os eventos do mês numa lista por dias — por omissão no telemóvel, onde a grelha do mês fica apertada */
+  const mode = filters.calMode || (innerWidth <= 640 ? 'agenda' : 'month');
+  const modeSeg = h('div', {class:'seg cal-mode', role:'group', 'aria-label':_('Vista do calendário')}, [['month', _('Mês')], ['agenda', _('Agenda')]].map(([k, l]) => h('button', {class:k === mode ? 'on' : '', 'aria-pressed':String(k === mode), dataset:{mode:k}, onclick:() => { filters.calMode = k; filters.calDay = null; renderAll(); }}, l)));
+  const agenda = () => { const days = [...new Set(inMonth.map(e => e.date))];
+    return h('div', {class:'card static agenda'}, days.length ? days.map(iso => h('div', {class:'ag-day' + (iso === t ? ' today' : '') + (iso < t ? ' past' : ''), dataset:{day:iso}},
+        h('div', {class:'ag-date'}, h('b', null, +iso.slice(8)), h('span', null, new Date(iso + 'T12:00').toLocaleDateString(LOCALE, {weekday:'short'}).replace('.', ''))),
+        h('div', {class:'ag-evs'}, inMonth.filter(e => e.date === iso).map(e => h('div', {class:'cal-item' + (e.done ? ' done' : '')},
+          h('div', {class:'list-row' + (e.open ? ' click' : ''), onclick:e.open || null}, h('span', {class:'ev-dot ev-' + e.kind}), h('span', {class:'grow'}, (e.done ? '✓ ' : '') + e.title), e.time ? h('span', {class:'muted small'}, e.time) : null), calLinks(e))))))
+      : h('div', {class:'muted small'}, _('Sem eventos neste mês.')),
+      h('div', {style:{marginTop:'10px'}}, h('button', {class:'btn small', onclick:() => createGoalOn(month === t.slice(0, 7) ? t : month + '-01')}, _('+ Objetivo de pesquisa')))); };
   add(box,
     h('div', {class:'page-head sub'}, h('button', {class:'btn small', 'aria-label':_('Mês anterior'), onclick:() => shift(-1)}, '‹'),
       h('b', {class:'cal-title'}, (s => s.charAt(0).toUpperCase() + s.slice(1))(first.toLocaleDateString(LOCALE, {month:'long', year:'numeric'}))),
       h('button', {class:'btn small', 'aria-label':_('Mês seguinte'), onclick:() => shift(1)}, '›'),
-      h('button', {class:'btn small', onclick:() => { filters.calMonth = t.slice(0, 7); filters.calDay = null; renderAll(); }}, _('Hoje')), h('span', {class:'spacer'}),
+      h('button', {class:'btn small', onclick:() => { filters.calMonth = t.slice(0, 7); filters.calDay = null; renderAll(); }}, _('Hoje')), modeSeg, h('span', {class:'spacer'}),
       h('span', {class:'cal-legend small muted'}, h('span', {class:'ev-dot ev-goal'}), _('Pesquisa') + ' ', h('span', {class:'ev-dot ev-write'}), _('Escrita') + ' ', h('span', {class:'ev-dot ev-review'}), _('Revisão') + ' ', h('span', {class:'ev-dot ev-phase'}), _('Fases'))),
-    grid,
-    h('div', {class:'card static'}, h('h3', null, filters.calDay ? _('Eventos de {data}', {data:fmtDate(filters.calDay, true)}) : _('Eventos do mês'),
+    mode === 'agenda' ? agenda() : grid,
+    mode === 'agenda' ? null : h('div', {class:'card static'}, h('h3', null, filters.calDay ? _('Eventos de {data}', {data:fmtDate(filters.calDay, true)}) : _('Eventos do mês'),
         filters.calDay ? h('button', {class:'btn small', style:{marginLeft:'10px'}, onclick:() => { filters.calDay = null; renderAll(); }}, _('Ver o mês todo')) : null),
       shown.length ? shown.map(e => h('div', {class:'cal-item' + (e.done ? ' done' : '')},
         h('div', {class:'list-row' + (e.open ? ' click' : ''), onclick:e.open || null}, h('span', {class:'ev-dot ev-' + e.kind}), h('span', {class:'grow'}, (e.done ? '✓ ' : '') + e.title),
           h('span', {class:'muted small'}, fmtDate(e.date, true) + (e.time ? ' · ' + e.time : ''))), calLinks(e)))
-        : h('div', {class:'muted small'}, _('Sem eventos neste mês.'))),
+        : h('div', {class:'muted small'}, filters.calDay ? _('Sem eventos neste dia.') : _('Sem eventos neste mês.')),
+      filters.calDay ? h('div', {style:{marginTop:'10px'}}, h('button', {class:'btn small', onclick:() => createGoalOn(filters.calDay)}, _('+ Objetivo de pesquisa neste dia'))) : null),
     h('div', {class:'card static'}, h('h3', null, _('Sincronizar com outros calendários')),
       h('p', {class:'muted small'}, _('«Exportar calendário (.ics)» cria um ficheiro com todos os prazos e objetivos, para importar no Google Calendar (Definições › Importar e exportar), no Apple Calendar (Ficheiro › Importar) ou no Outlook (Adicionar calendário › Carregar a partir de ficheiro) — o calendário do Microsoft Teams é o do Outlook. Cada evento tem um identificador fixo: ao importar uma versão nova, o Apple Calendar costuma atualizar os eventos; no Google Calendar os eventos já importados não mudam, e no Outlook pode ser preciso apagar os antigos — por isso, para acompanhar alterações, é mais simples criar um calendário só para o projeto e substituí-lo. Os prazos apagados aqui não desaparecem dos outros calendários. Em cada evento, os botões acrescentam-no diretamente a cada calendário. A sincronização é num só sentido — da ferramenta para os calendários —, porque a ferramenta não tem servidor nem acede às suas contas.'))));
 }
@@ -390,9 +500,17 @@ function planCalendar(box){
 /* ---------- integração com as fichas ---------- */
 function sceneProgSection(id){
   const s = state.scenes[id]; if (!s) return null;
-  return section(_('Progresso'), null, h('div', {class:'stage-grid'},
-    ...Object.keys(STAGES).map(k => h('div', {class:'stage-cell'}, h('b', {class:'small'}, STAGES[k]), stageCheck(s, k),
-      h('label', {class:'small muted'}, _('Prazo') + ' ', dueInput(stg(s, k).due, v => setSceneDue(id, k, v), k === 'write' ? _('Prazo de escrita') : _('Prazo de revisão'), isDone(s, k)))))),
+  const st = isDone(s, 'review') ? 2 : isDone(s, 'write') ? 1 : 0;
+  const go = n => { if (n === st) return;
+    if (n === 0) return setStage(id, 'write', false);
+    if (n === 1) return st === 2 ? setStage(id, 'review', false) : setStage(id, 'write', true);
+    if (st === 0) editStage(s, p => { p.write.done = true; p.write.at = Date.now(); }); // de «por escrever» para «revista»: fica também escrita
+    setStage(id, 'review', true); };
+  const step = (n, label, ic) => h('button', {'aria-pressed':String(st === n), dataset:{st:n}, onclick:() => go(n)}, svgIcon(ic), h('span', null, label));
+  return section(_('Progresso'), null, h('div', {class:'steps3', role:'group', 'aria-label':_('Estado da Cena')}, step(0, _('Por escrever'), 'circle'), step(1, _x('estado', 'Escrita'), 'check'), step(2, _('Revista'), 'check2')),
+    h('div', {class:'stage-grid'},
+    ...Object.keys(STAGES).map(k => h('div', {class:'stage-cell'},
+      h('label', {class:'small muted'}, (k === 'write' ? _('Prazo de escrita') : _('Prazo de revisão')) + ' ', dueInput(stg(s, k).due, v => setSceneDue(id, k, v), k === 'write' ? _('Prazo de escrita') : _('Prazo de revisão'), isDone(s, k)))))),
     goalsSection('scene', id));
 }
 function bookProgSection(b){

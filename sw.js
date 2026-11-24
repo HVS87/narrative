@@ -9,7 +9,7 @@ const SHELL = ['./', 'index.html', 'js/version.js', 'js/update.js', 'styles.css'
   'js/i18n.js', 'js/lang-en.js', 'js/lang-es.js', 'js/lang-fr.js', 'js/data.js',
   'js/apoio-pt-0.js', 'js/apoio-a.js', 'js/apoio-b.js', 'js/apoio-c.js', 'js/apoio-d.js', 'js/apoio-e.js', 'js/apoio-f.js', 'js/apoio-g.js', 'js/apoio-h.js', 'js/apoio-i.js',
   'js/apoio-en-1.js', 'js/apoio-en-2.js', 'js/apoio-en-3.js', 'js/apoio-es-1.js', 'js/apoio-es-2.js', 'js/apoio-es-3.js', 'js/apoio-fr-1.js', 'js/apoio-fr-2.js', 'js/apoio-fr-3.js',
-  'js/core.js', 'js/board.js', 'js/fichas.js', 'js/tabs.js', 'js/nav.js', 'js/projects.js', 'js/plan.js', 'js/device.js', 'js/sync.js', 'js/vendor/peerjs.min.js', 'js/tour.js', 'js/tips.js', 'js/prefs.js'];
+  'js/core.js', 'js/board.js', 'js/fichas.js', 'js/tabs.js', 'js/nav.js', 'js/view.js', 'js/find.js', 'js/projects.js', 'js/plan.js', 'js/device.js', 'js/sync.js', 'js/vendor/peerjs.min.js', 'js/tour.js', 'js/tips.js', 'js/prefs.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

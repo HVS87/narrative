@@ -283,27 +283,131 @@ function projUI(){
   if (none) document.title = 'Narrative';
 }
 
+/* a silhueta de um projeto: as linhas dos seus Arcos Narrativos ao longo da narrativa, em miniatura (sem texto) */
+function projThumb(id){
+  let d = null; try { d = JSON.parse(lsGet(projKey(id))); } catch(e){}
+  const W = 132, H = 44, box = h('span', {class:'land-thumb', 'aria-hidden':'true'});
+  if (!d || !Array.isArray(d.books) || !d.scenes) return box;
+  const order = []; d.books.forEach(b => (b.chapters || []).forEach(c => (c.scenes || []).forEach(s => { if (d.scenes[s]) order.push(s); })));
+  const arcs = (d.arcs || []).filter(a => a && order.some(s => d.scenes[s].arcId === a.id)), n = order.length, rows = Math.max(arcs.length, 1);
+  if (!n){ box.classList.add('empty'); return box; }
+  const x = i => n === 1 ? W / 2 : 6 + i * (W - 12) / (n - 1), y = r => rows === 1 ? H / 2 : 7 + r * (H - 14) / (rows - 1);
+  let out = '', bx = 0; d.books.forEach((b, bi) => { const k = (b.chapters || []).reduce((t, c) => t + (c.scenes || []).filter(s => d.scenes[s]).length, 0); if (bi && k && bx) out += '<path class="lt-book" d="M' + (x(bx) - (W - 12) / Math.max(1, n - 1) / 2).toFixed(1) + ',2V' + (H - 2) + '"/>'; bx += k; });
+  arcs.forEach((a, r) => { const pts = order.map((s, i) => d.scenes[s].arcId === a.id ? [x(i), y(r)] : null).filter(Boolean), col = arcStroke(a);
+    out += '<path d="M' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join('L') + '" stroke="' + col + '"/>' + pts.map(p => '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.2" fill="' + col + '"/>').join(''); });
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '">' + out + '</svg>'; return box;
+}
+
 /* ---------- página inicial (sem projetos abertos) ---------- */
 function renderLanding(L){
   L.innerHTML = '';
   const I = Projects.idx;
-  const card = (ic, title, text, fn, primary) => h('button', {class:'land-card' + (primary ? ' primary' : ''), onclick:fn}, h('span', {class:'land-ic', 'aria-hidden':'true'}, ic), h('span', {class:'land-t'}, title), h('span', {class:'land-d'}, text));
+  const card = (ic, title, text, fn, primary) => h('button', {class:'land-card' + (primary ? ' primary' : ''), onclick:fn}, h('span', {class:'land-ic', 'aria-hidden':'true'}, svgIcon(ic)), h('span', {class:'land-t'}, title), h('span', {class:'land-d'}, text));
   const logo = $('#topbar .logo').cloneNode(true); logo.classList.add('land-logo');
   add(L, h('div', {class:'land'},
     logo,
     h('h1', null, 'Narrative'),
     h('p', {class:'muted'}, _('Construa, desenhe e reorganize a sua narrativa: Tomos, Capítulos, Cenas e Arcos Narrativos num só quadro.')),
     h('div', {class:'land-cards'},
-      card('+', _('Criar novo Projeto'), _('Começa um projeto em branco.'), newProject, true),
-      card('📂', _('Abrir Projeto'), _('Abre um projeto guardado num ficheiro.'), pickProjectFile),
-      card('?', _('Correr visita guiada'), _('Mostra as principais funcionalidades em cerca de três minutos, sem alterar nada.'), () => startTour())),
+      card('plus', _('Criar novo Projeto'), _('Começa um projeto em branco.'), newProject, true),
+      card('folder', _('Abrir Projeto'), _('Abre um projeto guardado num ficheiro.'), pickProjectFile),
+      card('help', _('Correr visita guiada'), _('Mostra as principais funcionalidades em cerca de três minutos, sem alterar nada.'), () => startTour())),
+    h('div', {class:'land-cards land-more'},
+      card('spark', _('Começar com um exemplo'), _('Abre uma pequena narrativa já preenchida, para explorar, alterar e apagar à vontade.'), startExample),
+      card('template', _('Começar de um modelo'), _('Três atos, jornada do herói ou duas linhas temporais: a estrutura fica criada, vazia, pronta a preencher.'), templateDialog)),
     h('p', {class:'small'}, h('button', {class:'linkish', onclick:() => startTour('deep')}, _('Ou faça já a visita detalhada')), h('span', {class:'muted'}, _(' — mais longa, funcionalidade a funcionalidade.'))),
     I.recent.length ? h('div', {class:'land-recent'}, h('h2', null, _('Projetos recentes')),
-      I.recent.map(id => { const m = projMeta(id);
-        return h('div', {class:'list-row'}, h('button', {class:'grow land-reopen', onclick:() => projReopen(id)}, h('b', null, m.name),
+      I.recent.map((id, i) => { const m = projMeta(id);
+        return h('div', {class:'list-row land-proj'}, projThumb(id), h('button', {class:'grow land-reopen', onclick:() => projReopen(id)}, h('b', null, m.name),
           h('span', {class:'muted small'}, m.closedAt ? _(' · fechado a {data}', {data:new Date(m.closedAt).toLocaleString(LOCALE, {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}) : '', m.dirty ? _(' · com alterações por guardar em ficheiro') : '')),
-          h('button', {class:'btn small', onclick:() => projReopen(id)}, _('Reabrir')), h('button', {class:'btn small', 'aria-label':_('Remover {nome}', {nome:m.name}), onclick:() => projForget(id)}, _('Remover'))); }))
+          h('button', {class:'btn small' + (i === 0 ? ' primary' : ''), onclick:() => projReopen(id)}, i === 0 ? _('Continuar') : _('Reabrir')), h('button', {class:'btn small', 'aria-label':_('Remover {nome}', {nome:m.name}), onclick:() => projForget(id)}, _('Remover'))); }))
       : null));
+}
+
+/* ---------- importar de outro projeto aberto: Personagens, Localizações e Referências ----------
+   Copia para o projeto à vista o que se escolher de outro projeto aberto (o outro não é alterado). O que já existe cá com
+   o mesmo nome fica assinalado e por escolher. As Localizações trazem a ligação às Personagens que também vierem (ou que
+   já cá estejam, pelo nome); as Referências trazem os ficheiros e as ligações a essas Personagens e Localizações — as
+   ligações a Cenas, Tomos e Arcos do outro projeto não vêm, porque essas coisas ficam lá. */
+const IMPORT_KINDS = [['characters', _('Personagens'), 'people'], ['sceneries', _('Localizações'), 'pin'], ['refs', _('Referências'), 'mark']];
+function importSource(id){ try { return sanitize(JSON.parse(lsGet(projKey(id)))); } catch(e){ return null; } }
+function importDialog(pre){
+  if (tourMode || projNone()) return;
+  const others = Projects.idx.open.filter(id => id !== projActive());
+  if (!others.length) return toast(_('Só se importa de outro projeto aberto. Abra-o primeiro: no menu do nome do projeto, «Abrir Projeto…».'));
+  let src = others[0], data = null, m = null; const sel = {characters:new Set(), sceneries:new Set(), refs:new Set()};
+  const lower = x => String(x || '').trim().toLowerCase();
+  const exists = { characters:c => state.characters.some(x => lower(x.name) === lower(c.name)), sceneries:c => state.sceneries.some(x => lower(x.name) === lower(c.name)),
+    refs:r => state.refs.some(x => x.type === r.type && lower(x.title) === lower(r.title) && lower(x.url) === lower(r.url) && lower(x.fileName) === lower(r.fileName)) };
+  const label = { characters:c => c.name, sceneries:c => c.name, refs:r => r.title || _('Sem título') };
+  const body = h('div', {class:'modal-body imp-body'});
+  const load = () => { data = importSource(src); for (const k in sel) sel[k].clear();
+    if (data && pre && data[pre]) data[pre].forEach(x => { if (!exists[pre](x)) sel[pre].add(x.id); }); };
+  const total = () => sel.characters.size + sel.sceneries.size + sel.refs.size;
+  const draw = () => {
+    const pick = others.length > 1 ? field(_('Importar do projeto'), selectEl(others.map(id => ({value:id, label:projMeta(id).name})), src, v => { src = v; load(); draw(); })) : h('p', {class:'muted', style:{margin:'0 0 10px'}}, _('Do projeto «{nome}».', {nome:projMeta(src).name}));
+    if (!data) return body.replaceChildren(pick, h('p', {class:'muted'}, _('Não foi possível ler esse projeto.')));
+    const group = ([k, name, ic]) => { const list = data[k] || [], free = list.filter(x => !exists[k](x)), all = free.length > 0 && free.every(x => sel[k].has(x.id));
+      return h('div', {class:'imp-group', dataset:{kind:k}},
+        h('div', {class:'imp-head'}, svgIcon(ic), h('b', null, name), h('span', {class:'muted small'}, list.length ? _('{n} de {total} escolhidas', {n:sel[k].size, total:list.length}) : _('nenhuma')),
+          free.length ? h('button', {class:'btn small imp-all', onclick:() => { if (all) free.forEach(x => sel[k].delete(x.id)); else free.forEach(x => sel[k].add(x.id)); draw(); }}, all ? _('Nenhuma') : _('Todas')) : null),
+        list.length ? h('div', {class:'imp-list'}, list.map(x => { const dup = exists[k](x);
+          return h('label', {class:'imp-item' + (dup ? ' dup' : '')}, h('input', {type:'checkbox', checked:sel[k].has(x.id), onchange:e => { if (e.target.checked) sel[k].add(x.id); else sel[k].delete(x.id); draw(); }}),
+            k === 'refs' ? refIcon(x.type) : null, h('span', {class:'imp-name'}, label[k](x)), dup ? h('span', {class:'badge'}, _('já existe')) : null); })) : null); };
+    const n = total();
+    body.replaceChildren(pick, ...IMPORT_KINDS.map(group),
+      h('p', {class:'muted small'}, _('O que escolher é copiado para este projeto; o outro não é alterado. As ligações a Cenas, Tomos e Arcos Narrativos do outro projeto não vêm.')),
+      h('div', {class:'modal-foot'}, h('button', {class:'btn', onclick:() => m.close()}, _('Cancelar')),
+        h('button', {class:'btn primary imp-go', disabled:!n, onclick:async () => { const done = await importFrom(data, sel); m.close(); if (done) toast(done); }}, n ? _n(n, 'Importar {n} elemento', 'Importar {n} elementos') : _('Importar'))));
+  };
+  load(); m = openModal({title:_('Importar de outro projeto'), body, wide:true, cls:'imp-modal'}); draw();
+}
+async function importFrom(data, sel){
+  const lower = x => String(x || '').trim().toLowerCase(), cmap = {}, smap = {}; let nc = 0, ns = 0, nr = 0;
+  /* quem não vem mas já cá está com o mesmo nome continua a contar para as ligações */
+  data.characters.forEach(c => { const here = state.characters.find(x => lower(x.name) === lower(c.name));
+    if (sel.characters.has(c.id)){ const n = Object.assign({}, c, {id:uid('ch')}); state.characters.push(n); cmap[c.id] = n.id; nc++; } else if (here) cmap[c.id] = here.id; });
+  data.sceneries.forEach(x => { const here = state.sceneries.find(y => lower(y.name) === lower(x.name));
+    if (sel.sceneries.has(x.id)){ const n = Object.assign({}, x, {id:uid('sc'), chars:[...new Set((x.chars || []).map(c => cmap[c]).filter(Boolean))]}); state.sceneries.push(n); smap[x.id] = n.id; ns++; } else if (here) smap[x.id] = here.id; });
+  for (const r of data.refs){ if (!sel.refs.has(r.id)) continue;
+    const links = (r.links || []).map(l => l.kind === 'character' && cmap[l.id] ? {kind:'character', id:cmap[l.id]} : l.kind === 'scenery' && smap[l.id] ? {kind:'scenery', id:smap[l.id]} : null).filter(Boolean);
+    const n = Object.assign({}, r, {id:uid('r'), links, created:Date.now() + nr});
+    if (r.fileName){ try { const blob = await idb.get(r.id); if (blob) await idb.put(n.id, blob); } catch(e){} } // o ficheiro vem com a Referência
+    state.refs.push(n); nr++; }
+  if (!(nc + ns + nr)) return '';
+  commit();
+  const parts = [nc ? _n(nc, '{n} Personagem', '{n} Personagens') : null, ns ? _n(ns, '{n} Localização', '{n} Localizações') : null, nr ? _n(nr, '{n} Referência', '{n} Referências') : null].filter(Boolean);
+  return _('Importado: {lista}.', {lista:parts.join(', ')});
+}
+
+/* ---------- primeiros passos: um exemplo para mexer e modelos de estrutura ---------- */
+function startExample(){
+  if (tourMode) return;
+  if (!projAdd(sanitize(demoProject()))) return;
+  activeTab = 'board'; renderAll();
+  toast(_('Exemplo aberto. É um projeto como os outros: pode alterá-lo, guardá-lo ou fechá-lo.'));
+}
+const TEMPLATES = [
+  ['atos', _('Três atos'), _('Apresentação, confronto e resolução: a estrutura clássica, num Tomo com três Capítulos.')],
+  ['heroi', _('Jornada do herói'), _('As doze etapas, do mundo comum ao regresso com o elixir: um Capítulo para cada uma.')],
+  ['linhas', _('Duas linhas temporais'), _('Dois Arcos Narrativos, «Presente» e «Passado», que se alternam ao longo dos Capítulos.')]];
+function templateProject(k){
+  if (tourMode || !projAdd(blankProject())) return;
+  const chapters = { atos:[_('Ato I — Apresentação'), _('Ato II — Confronto'), _('Ato III — Resolução')],
+    heroi:[_('O mundo comum'), _('A chamada à aventura'), _('A recusa da chamada'), _('O encontro com o mentor'), _('A travessia do primeiro limiar'), _('Provas, aliados e inimigos'),
+      _('A aproximação da caverna oculta'), _('A provação'), _('A recompensa'), _('O caminho de volta'), _('A ressurreição'), _('O regresso com o elixir')],
+    linhas:[_('Abertura'), _('As duas linhas avançam'), _('As duas linhas aproximam-se'), _('Desfecho')] }[k];
+  const arcs = { atos:[_('Trama principal')], heroi:[_('Jornada do herói')], linhas:[_('Presente'), _('Passado')] }[k];
+  state.books[0].chapters = chapters.map(n => ({id:uid('c'), name:n, scenes:[]}));
+  arcs.forEach(n => newArc(n));
+  activeTab = 'board'; commit(); histInit(); // o projeto começa aqui: não há nada para anular
+  toast(_('Modelo criado: os Capítulos e os Arcos Narrativos estão prontos a receber Cenas.'));
+}
+function templateDialog(){
+  if (tourMode) return; let m = null;
+  m = openModal({title:_('Começar de um modelo'), body:h('div', {class:'modal-body'},
+    h('p', {class:'muted', style:{marginTop:'0'}}, _('O modelo cria os Capítulos e os Arcos Narrativos, sem Cenas. Depois pode mudar tudo: nomes, ordem e número de Capítulos.')),
+    h('div', {class:'tpl-list'}, TEMPLATES.map(([k, name, desc]) => h('button', {class:'tpl-item', dataset:{tpl:k}, onclick:() => { m.close(); templateProject(k); }}, h('b', null, name), h('span', {class:'muted small'}, desc)))))});
 }
 
 /* ---------- outra janela deste dispositivo mudou a lista ou o projeto ativo ---------- */
