@@ -756,6 +756,18 @@ body.ul-links a,body.ul-links .linkish{text-decoration:underline;text-underline-
 #langBtn{display:none;font-size:12.5px;font-weight:700;letter-spacing:.5px;width:auto;min-width:38px;padding:0 8px;border:1.5px solid var(--border);border-radius:10px;height:32px;margin-right:4px}
 body.no-project #langBtn{display:inline-flex;align-items:center;justify-content:center}
 .lang-menu .ctx-item{font-variant-numeric:tabular-nums}
+/* botão das cores, também só no ecrã inicial, e as amostras das paletas */
+#palBtn{display:none;margin-right:2px}
+body.no-project #palBtn{display:inline-flex}
+.pal-mini{display:inline-flex;width:44px;height:18px;border-radius:5px;overflow:hidden;flex:none;box-shadow:0 0 0 1px var(--border)}
+.pal-mini span{flex:1}
+.pal-item{display:flex;align-items:center;gap:10px;min-width:170px}
+.pal-item.on{font-weight:700}
+.pal-row{display:flex;flex-wrap:wrap;gap:8px}
+.pal-pick{border:2px solid transparent;border-radius:9px;padding:3px;background:transparent;cursor:pointer;line-height:0}
+.pal-pick .pal-mini{width:52px;height:24px}
+.pal-pick.on{border-color:var(--accent)}
+.pal-pick:hover:not(.on){border-color:var(--border)}
 /* ---------- ficha da Cena: a fita do percurso e as setas ----------
    No topo da ficha, duas linhas grossas, como as do quadro: a branca (Ordem Narrativa) e a da cor do Arco Narrativo.
    Cada linha liga a Cena anterior à posição desta Cena e à Cena seguinte, e acaba nas caixas dessas Cenas; as bifurcações

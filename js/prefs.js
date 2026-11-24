@@ -36,6 +36,37 @@ function initLangBtn(){
   b.addEventListener('click', e => langMenu(e.currentTarget));
 }
 
+/* ----- cores: na página inicial (sem projetos abertos), um botão ao lado da língua escolhe a paleta ----- */
+const palSwatch = pal => { const v = paletteVars(pal); return h('span', {class:'pal-mini', 'aria-hidden':'true'}, ['--bg', '--surface2', '--accent', '--text'].map(k => h('span', {style:{background:v[k]}}))); };
+const palIsOn = pal => pal.h === state.project.palette.h && pal.mode === effectiveMode();
+/* a paleta escolhida dá o tom à página inicial e aos projetos novos; o modo (claro ou escuro) fica lembrado neste dispositivo */
+function pickHomePal(pal){
+  if (tourMode || !state) return;
+  lsSet(LS_PAL, String(pal.h)); lsSet(LS_THEME, pal.mode);
+  state.project.palette = {h:pal.h, mode:pal.mode}; applyPalette();
+  if (projNone()) renderAll(); else commit();
+}
+function palMenu(btn){
+  if (wasOpen(btn)) return;
+  const items = PRESET_PALETTES.map(pal => ({label:h('span', {class:'pal-item' + (palIsOn(pal) ? ' on' : '')}, palSwatch(pal), h('span', {class:'grow'}, pal.name), h('span', {class:'proj-check', 'aria-hidden':'true'}, palIsOn(pal) ? '✓' : '')),
+    action:() => pickHomePal(pal)}));
+  if (themePref() !== 'auto') items.push('-', {label:_('Claro ou escuro: seguir o sistema'), action:() => setTheme('auto')});
+  topMenu(btn, items, 'pal-menu');
+}
+function initPalBtn(){
+  const b = $('#palBtn'); if (!b) return;
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS.palette + '</svg>';
+  b.setAttribute('aria-label', _('Cores')); b.title = _('Mudar a paleta de cores');
+  b.addEventListener('click', e => palMenu(e.currentTarget));
+}
+/* nas boas-vindas: as mesmas paletas, em amostras pequenas */
+function palPicker(){
+  const row = h('div', {class:'pal-row', role:'radiogroup', 'aria-label':_('Cores')});
+  const mark = () => row.querySelectorAll('button').forEach((b, i) => { const on = palIsOn(PRESET_PALETTES[i]); b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+  PRESET_PALETTES.forEach(pal => row.append(h('button', {class:'pal-pick', role:'radio', title:pal.name, 'aria-label':pal.name, onclick:() => { pickHomePal(pal); mark(); }}, palSwatch(pal))));
+  mark(); return row;
+}
+
 /* ----- acessibilidade ----- */
 const LS_A11Y = 'narrativa.a11y';
 const A11Y_DEF = { size:'m', motion:'auto', contrast:false, links:false };
@@ -75,8 +106,9 @@ function welcomeIfNeeded(){
   const body = h('div', {class:'modal-body welcome'},
     h('p', {class:'privacy-main'}, privacyText()), h('p', {class:'muted small'}, privacyDetail()),
     h('div', {class:'field'}, h('label', null, _('Língua')), langPicker()),
+    h('div', {class:'field'}, h('label', null, _('Cores')), palPicker()),
     h('div', {class:'modal-foot'}, h('button', {class:'btn primary', onclick:done}, _('Começar'))));
   const m = openModal({title:_('Bem-vindo ao Narrative'), body, cls:'welcome-modal', onClose:() => lsSet(LS_PRIV, '1')});
   setTimeout(() => { const b = body.querySelector('.btn.primary'); b && b.focus(); }, 0);
 }
-window.addEventListener('DOMContentLoaded', () => { applyA11y(); initLangBtn(); setTimeout(welcomeIfNeeded, 300); });
+window.addEventListener('DOMContentLoaded', () => { applyA11y(); initLangBtn(); initPalBtn(); setTimeout(welcomeIfNeeded, 300); });

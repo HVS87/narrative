@@ -24,6 +24,7 @@ const ICONS = {
   flag:'<path d="M6 21V4h11l-2 3.5L17 11H6"/>',
   list:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke-width="2.8"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  palette:'<path d="M12 3a9 9 0 0 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2.1a4.4 4.4 0 0 0 4.4-4.4C21 6.5 17 3 12 3z"/><path d="M7.5 12h.01M9 7.8h.01M13.5 6.8h.01M17 9.5h.01" stroke-width="2.6"/>',
   /* setas para percorrer as Cenas: a mesma família, com haste e ponta — em frente, bifurcação (uma linha que se divide) e convergência (duas que se juntam) */
   arrL:'<path d="M20 12H5M9.5 7.5L5 12l4.5 4.5"/>', arrR:'<path d="M4 12h15M14.5 7.5L19 12l-4.5 4.5"/>',
   forkR:'<path d="M3 12h4.5c3.5 0 3-5.5 6.5-5.5h5.5M7.5 12c3.5 0 3 5.5 6.5 5.5h5.5M16.8 3.8l2.7 2.7-2.7 2.7M16.8 14.8l2.7 2.7-2.7 2.7"/>',
@@ -124,7 +125,7 @@ function topMenu(btn, items, cls){
 }
 /* o mesmo clique que fecha um destes menus não o volta a abrir (o menu fecha-se ao premir, antes do clique) */
 const wasOpen = btn => { const w = btn._wasOpen && performance.now() - btn._downAt < 1500; btn._wasOpen = false; return w; };
-window.addEventListener('pointerdown', e => { const b = e.target.closest && e.target.closest('#tourBtn,#moreBtn,#createBtn,#langBtn');
+window.addEventListener('pointerdown', e => { const b = e.target.closest && e.target.closest('#tourBtn,#moreBtn,#createBtn,#langBtn,#palBtn');
   if (b){ b._wasOpen = b.getAttribute('aria-expanded') === 'true'; b._downAt = performance.now(); } }, true);
 function helpMenu(btn){ if (Tour.active || wasOpen(btn)) return; topMenu(btn, [{label:_('Visita guiada'), action:() => startTour()}, {label:_('Visita detalhada'), action:() => startTour('deep')}, '-', {label:_('Atalhos de teclado'), action:shortcutsSheet}], 'help-menu'); }
 function moreMenu(btn){

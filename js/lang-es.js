@@ -1432,7 +1432,7 @@ I18N.es = {
   "Cada Tomo tem um tipo de narrador. A ficha de cada tipo, nos Materiais de Apoio, explica-o com exemplos; as fichas ligam-se umas às outras e a pesquisa dos Materiais de Apoio encontra-as por qualquer palavra.": "Cada Tomo tiene un tipo de narrador. La ficha de cada tipo, en la Guía de escritura, lo explica con ejemplos; las fichas están vinculadas entre sí y la búsqueda de la Guía de escritura las encuentra por cualquier palabra.",
   "A cor distingue o Tomo no quadro (faixa no cabeçalho e fundo da coluna), no separador Tomos e nas listas das fichas. Há cores sugeridas, «sem cor» e qualquer outra, pelo seletor do sistema; o texto mantém-se legível em qualquer paleta.": "El color distingue el Tomo en el tablero (franja en el encabezado y fondo de la columna), en la pestaña Tomos y en las listas de las fichas. Hay colores sugeridos, «sin color» y cualquier otro, con el selector del sistema; el texto sigue siendo legible con cualquier paleta.",
   "Paletas de cores": "Paletas de colores",
-  "As paletas mudam as cores de toda a ferramenta (escuras e claras). «Gerar novas paletas» propõe outras; o contraste do texto é verificado em todas, e as cores dos Arcos Narrativos ajustam-se para continuarem legíveis.": "Las paletas cambian los colores de toda la herramienta (oscuras y claras). «Generar nuevas paletas» propone otras; el contraste del texto se verifica en todas, y los colores de los Arcos narrativos se ajustan para seguir siendo legibles.",
+  "As paletas mudam as cores de toda a ferramenta (escuras e claras). «Gerar novas paletas» propõe outras; o contraste do texto é verificado em todas, e as cores dos Arcos Narrativos ajustam-se para continuarem legíveis. Na página inicial, sem projetos abertos, o botão das cores, ao lado da língua, escolhe a paleta, que passa a ser também a dos projetos novos.": "Las paletas cambian los colores de toda la herramienta (oscuras y claras). «Generar nuevas paletas» propone otras; el contraste del texto se verifica en todas, y los colores de los Arcos narrativos se ajustan para seguir siendo legibles. En la página inicial, sin proyectos abiertos, el botón de los colores, junto al idioma, elige la paleta, que pasa a ser también la de los proyectos nuevos.",
   "Vários projetos": "Varios proyectos",
   "«Abrir Projeto» acrescenta o projeto de um ficheiro aos que estão abertos (se já estiver aberto, pergunta se o substitui). «Fechar Projeto» pergunta se quer guardar quando há alterações por guardar; o projeto fechado fica nos «Projetos recentes» da página inicial, de onde se reabre. A ferramenta pode também perguntar antes de sair.": "«Abrir proyecto» añade el proyecto de un archivo a los que están abiertos (si ya está abierto, pregunta si quiere sustituirlo). «Cerrar proyecto» pregunta si quiere guardar cuando hay cambios sin guardar; el proyecto cerrado queda en «Proyectos recientes» de la página de inicio, desde donde se vuelve a abrir. La herramienta también puede preguntar antes de salir.",
   "Sincronização em pormenor": "Sincronización en detalle",
@@ -1504,5 +1504,9 @@ I18N.es = {
   "Ajuda e visitas guiadas": "Ayuda y visitas guiadas",
   "Áreas da ferramenta": "Secciones de la herramienta",
   "Filtros e vistas da Narrativa": "Filtros y vistas de la Narrativa",
-  "Atualizar": "Actualizar"
+  "Atualizar": "Actualizar",
+  "Cores": "Colores",
+  "Mudar a paleta de cores": "Cambiar la paleta de colores",
+  "Claro ou escuro: seguir o sistema": "Claro u oscuro: seguir el sistema",
+  "Escolha as cores da página inicial e dos projetos novos. Cada projeto pode mudar as suas nas Definições.": "Elija los colores de la página inicial y de los proyectos nuevos. Cada proyecto puede cambiar los suyos en Ajustes."
 };

@@ -383,7 +383,8 @@ async function importFrom(data, sel){
 /* ---------- primeiros passos: um exemplo para mexer e modelos de estrutura ---------- */
 function startExample(){
   if (tourMode) return;
-  if (!projAdd(sanitize(demoProject()))) return;
+  const d = sanitize(demoProject()); d.project.palette = {h:homeHue(), mode:'dark'}; // com as cores escolhidas na página inicial
+  if (!projAdd(d)) return;
   activeTab = 'board'; renderAll();
   toast(_('Exemplo aberto. É um projeto como os outros: pode alterá-lo, guardá-lo ou fechá-lo.'));
 }

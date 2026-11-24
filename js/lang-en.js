@@ -1432,7 +1432,7 @@ I18N.en = {
   "Cada Tomo tem um tipo de narrador. A ficha de cada tipo, nos Materiais de Apoio, explica-o com exemplos; as fichas ligam-se umas às outras e a pesquisa dos Materiais de Apoio encontra-as por qualquer palavra.": "Each Book has a narrator type. Each type's entry, in the Writing Guide, explains it with examples; entries link to each other and the Writing Guide search finds them by any word.",
   "A cor distingue o Tomo no quadro (faixa no cabeçalho e fundo da coluna), no separador Tomos e nas listas das fichas. Há cores sugeridas, «sem cor» e qualquer outra, pelo seletor do sistema; o texto mantém-se legível em qualquer paleta.": "The color sets the Book apart on the board (a band in the header and the column background), in the Books tab and in the lists in details. There are suggested colors, “no color” and any other, through the system picker; text stays readable in any palette.",
   "Paletas de cores": "Color palettes",
-  "As paletas mudam as cores de toda a ferramenta (escuras e claras). «Gerar novas paletas» propõe outras; o contraste do texto é verificado em todas, e as cores dos Arcos Narrativos ajustam-se para continuarem legíveis.": "Palettes change the colors of the whole tool (dark and light). “Generate new palettes” suggests others; text contrast is checked in all of them, and Story Arc colors adjust to stay readable.",
+  "As paletas mudam as cores de toda a ferramenta (escuras e claras). «Gerar novas paletas» propõe outras; o contraste do texto é verificado em todas, e as cores dos Arcos Narrativos ajustam-se para continuarem legíveis. Na página inicial, sem projetos abertos, o botão das cores, ao lado da língua, escolhe a paleta, que passa a ser também a dos projetos novos.": "Palettes change the colors of the whole tool (dark and light). “Generate new palettes” suggests others; text contrast is checked in all of them, and Story Arc colors adjust to stay readable. On the start page, with no projects open, the colors button next to the language picks the palette, which new projects then use too.",
   "Vários projetos": "Several projects",
   "«Abrir Projeto» acrescenta o projeto de um ficheiro aos que estão abertos (se já estiver aberto, pergunta se o substitui). «Fechar Projeto» pergunta se quer guardar quando há alterações por guardar; o projeto fechado fica nos «Projetos recentes» da página inicial, de onde se reabre. A ferramenta pode também perguntar antes de sair.": "“Open Project” adds the project from a file to the ones already open (if it's already open, it asks whether to replace it). “Close Project” asks whether you want to save when there are unsaved changes; the closed project stays in “Recent projects” on the home page, where you can reopen it. The tool can also ask before you leave.",
   "Sincronização em pormenor": "Sync in detail",
@@ -1504,5 +1504,9 @@ I18N.en = {
   "Ajuda e visitas guiadas": "Help and guided tours",
   "Áreas da ferramenta": "Tool areas",
   "Filtros e vistas da Narrativa": "Story filters and views",
-  "Atualizar": "Update"
+  "Atualizar": "Update",
+  "Cores": "Colors",
+  "Mudar a paleta de cores": "Change the color palette",
+  "Claro ou escuro: seguir o sistema": "Light or dark: follow the system",
+  "Escolha as cores da página inicial e dos projetos novos. Cada projeto pode mudar as suas nas Definições.": "Choose the colors of the start page and of new projects. Each project can change its own in Settings."
 };

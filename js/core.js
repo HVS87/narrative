@@ -11,8 +11,11 @@ const uid = p => p + Math.random().toString(36).slice(2, 9) + Date.now().toStrin
 let state = null;
 let tourMode = false; // durante a visita nada é guardado
 
+/* a paleta escolhida na página inicial (ou a última escolhida num projeto) é a dos projetos novos, neste dispositivo */
+const LS_PAL = 'narrativa.palette';
+const homeHue = () => { const v = lsGet(LS_PAL); return v != null && v !== '' && isFinite(v) ? ((Math.round(Number(v)) % 360) + 360) % 360 : 220; };
 function blankProject(){
-  return { version:1, project:{ name:_('Novo Projeto'), palette:{h:220,mode:'dark'} },
+  return { version:1, project:{ name:_('Novo Projeto'), palette:{h:homeHue(),mode:'dark'} },
     books:[{ id:uid('b'), name:_('Tomo 1'), narrator:'', color:null, mainChars:[], chapters:[{ id:uid('c'), name:_('Novo Capítulo'), scenes:[] }] }],
     scenes:{}, arcs:[], characters:[], sceneries:[], refs:[], goals:[] };
 }

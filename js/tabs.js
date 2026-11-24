@@ -266,7 +266,7 @@ function pageSettings(page, inDrawer){
   const p = state.project.palette;
   const palBtn = pal => { const v = paletteVars(pal);
     // a paleta escolhida dá o tom ao projeto e o modo (claro ou escuro) a este dispositivo — escolha que fica lembrada
-    return h('button', {class:'pal' + (pal.h === p.h && pal.mode === effectiveMode() ? ' on' : ''), onclick:() => { state.project.palette = {h:pal.h, mode:pal.mode}; lsSet(LS_THEME, pal.mode); applyPalette(); commit(); }},
+    return h('button', {class:'pal' + (pal.h === p.h && pal.mode === effectiveMode() ? ' on' : ''), onclick:() => { state.project.palette = {h:pal.h, mode:pal.mode}; lsSet(LS_THEME, pal.mode); lsSet(LS_PAL, String(pal.h)); applyPalette(); commit(); }},
       h('div', {class:'sw'}, ['--bg', '--surface2', '--border', '--accent', '--text'].map(k => h('span', {style:{background:v[k]}}))), h('div', {class:'small'}, pal.name)); };
   const pals = [...PRESET_PALETTES, ...extraPalettes]; // uma paleta gerada numa sessão anterior continua a aparecer, como «Atual»
   if (!pals.some(x => x.h === p.h && x.mode === effectiveMode())) pals.push({name:_('Atual'), h:p.h, mode:effectiveMode()});

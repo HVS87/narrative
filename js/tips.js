@@ -220,6 +220,7 @@ const TIP_RULES = [
   ['.tab', el => (TAB_TIPS[el.dataset.tab] || [])[0], el => (TAB_TIPS[el.dataset.tab] || [])[1]],
   ['#undoBtn', _('Anular (Ctrl+Z)'), _('Desfaz a última alteração ao projeto. O histórico guarda até 100 passos e recomeça quando a página é recarregada.')],
   ['#redoBtn', _('Refazer (Ctrl+Shift+Z)'), _('Repõe a alteração que acabou de anular.')],
+  ['#palBtn', _('Cores'), _('Escolha as cores da página inicial e dos projetos novos. Cada projeto pode mudar as suas nas Definições.')],
   ['#tourBtn', _('Ajuda'), _('A visita guiada e a visita detalhada percorrem as funcionalidades num projeto de demonstração, sem alterar os seus dados.')],
   ['#setBtn', _('Definições do Projeto'), el => el.classList.contains('on') ? _('Está nas Definições. Clique outra vez para voltar à área em que estava.') : _('Nome do projeto, sincronização, tema e paleta de cores, instalar como app, atualizações, explicadores e visitas.')],
   ['#moreBtn', _('Mais opções'), _('Novo, Abrir, Guardar e Fechar Projeto; Anular e Refazer.')],

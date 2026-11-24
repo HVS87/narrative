@@ -1830,6 +1830,23 @@ window.__qa = (async () => {
     { const el = box.querySelector('.ficha textarea'); P('pointerdown', 300, 300, el); for (let i = 1; i <= 6; i++) P('pointermove', 300 - i * 40, 300, el); P('pointerup', 60, 300, el); let clicked = 0; const nb = box.querySelector('.ficha .steps3 button'); nb.addEventListener('click', () => clicked++); nb.click(); eq(clicked, 0, 'o fim do gesto não conta como toque num botão'); slideStop(back); await W(420); nb.click(); eq(clicked, 1, 'logo a seguir, os toques voltam a contar'); }
     Tour.active = true; try { const t0 = title(); await swipe(-200); eq(title(), t0, 'na visita, não'); } finally { Tour.active = false; }
     ok(TOUR_STEPS.some(x => /deslize o dedo para o lado/.test(x.text)), 'a visita ensina o gesto'); closeAllModals(); fx(); });
+  await T('U03 página inicial: o botão das cores muda a paleta, que passa a ser a dos projetos novos; também nas boas-vindas', async () => {
+    const th0 = lsGet(LS_THEME), pal0 = lsGet(LS_PAL), back = (k, v) => v == null ? localStorage.removeItem(k) : lsSet(k, v);
+    try {
+      closeProject(); await W(20); if (modals().length){ await W(20); const b = btn('Fechar sem guardar', topModal()); b && b.click(); await W(40); } ok(projNone(), 'página inicial');
+      const b = $('#palBtn'); ok(getComputedStyle(b).display !== 'none', 'à vista ao lado da língua'); ok(tipFor(b), 'com explicador'); eq(b.getAttribute('aria-label'), 'Cores');
+      b.click(); await W(10); const menu = $('.pal-menu'); ok(menu, 'abre a lista das paletas'); eq(menu.querySelectorAll('.pal-item .pal-mini').length, PRESET_PALETTES.length, 'cada uma com a sua amostra');
+      [...menu.querySelectorAll('.ctx-item')].find(i => i.textContent.includes('Pergaminho')).click(); await W(10);
+      eq([state.project.palette.h, lsGet(LS_THEME), document.documentElement.dataset.mode, lsGet(LS_PAL)], [40, 'light', 'light', '40']); eq(LS_KEY, null, 'nada é gravado sem projeto');
+      eq(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(), paletteVars({h:40, mode:'light'})['--bg'], 'a página inicial muda de cores');
+      b.click(); await W(10); ok($('.pal-menu .pal-item.on') && $('.pal-menu .pal-item.on').textContent.includes('Pergaminho'), 'a escolhida fica assinalada');
+      const auto = [...$('.pal-menu').querySelectorAll('.ctx-item')].find(i => i.textContent.includes('seguir o sistema')); ok(auto, 'e há como voltar ao tema do sistema'); auto.click(); await W(10); eq(themePref(), 'auto');
+      $('#landing .land-card').click(); await W(30); ok(!projNone()); eq(state.project.palette.h, 40, 'o projeto novo fica com as cores escolhidas'); eq(getComputedStyle(b).display, 'none', 'com um projeto aberto, as cores mudam-se nas Definições');
+      lsSet(LS_THEME, 'dark'); localStorage.removeItem(LS_PRIV); welcomeIfNeeded(); await W(30); const picks = [...topModal().querySelectorAll('.pal-pick')]; eq(picks.length, PRESET_PALETTES.length, 'as paletas também nas boas-vindas');
+      const fl = picks.find(p => p.title === 'Floresta'); fl.click(); await W(10); eq([state.project.palette.h, lsGet(LS_PAL)], [150, '150']); ok(fl.classList.contains('on')); eq(picks.filter(p => p.getAttribute('aria-checked') === 'true'), [fl], 'só uma assinalada');
+      btn('Começar').click(); await W(20); eq(modals().length, 0);
+      ok(TOUR_DEEP.some(x => /botão das cores/.test(x.text)), 'a visita detalhada fala do botão');
+    } finally { back(LS_THEME, th0); back(LS_PAL, pal0); lsSet(LS_PRIV, '1'); state.project.palette = {h:220, mode:'dark'}; applyPalette(); closeAllModals(); fx(); } });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };
