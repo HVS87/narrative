@@ -523,13 +523,15 @@ function inlineRename(el, value, done){
 }
 async function askDeleteScene(id){
   const s = state.scenes[id]; if (!s) return false;
-  /* uma só coisa, e pode anular-se: elimina-se logo e a barra em baixo oferece «Anular» (a pergunta fica para o que leva outras coisas consigo) */
-  const nome = s.title || _('Sem título'); deleteScene(id); commit(); snack(_('Cena «{nome}» eliminada.', {nome}));
+  /* eliminar pergunta sempre; depois, a barra em baixo ainda oferece «Anular» */
+  const nome = s.title || _('Sem título');
+  if (!await confirmDialog(_('Eliminar a Cena «{nome}»?', {nome}), {title:_('Eliminar Cena'), ok:_('Eliminar')}) || !state.scenes[id]) return false;
+  deleteScene(id); commit(); snack(_('Cena «{nome}» eliminada.', {nome}));
   return true;
 }
 async function askDeleteChapter(id){
   const f = findChapter(id); const n = f.chapter.scenes.length;
-  if (!n){ const nome = f.chapter.name; deleteChapter(id); commit(); return snack(_('Capítulo «{nome}» eliminado.', {nome})); }
+  if (!n){ const nome = f.chapter.name; if (await confirmDialog(_('Eliminar o Capítulo «{nome}»?', {nome}), {title:_('Eliminar Capítulo'), ok:_('Eliminar')}) && findChapter(id)){ deleteChapter(id); commit(); snack(_('Capítulo «{nome}» eliminado.', {nome})); } return; }
   if (await confirmDialog(n === 1 ? _('Eliminar o Capítulo «{nome}» e a sua Cena?', {nome:f.chapter.name}) : n ? _('Eliminar o Capítulo «{nome}» e as suas {n} Cenas?', {nome:f.chapter.name, n}) : _('Eliminar o Capítulo «{nome}»?', {nome:f.chapter.name}), {title:_('Eliminar Capítulo'), ok:_('Eliminar')})){ deleteChapter(id); commit(); }
 }
 async function askDeleteBook(id){

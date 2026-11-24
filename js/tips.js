@@ -75,7 +75,7 @@ const TEXT_TIPS = trK({
   'Atualizar agora':[_('Atualizar agora'), _('Recarrega a ferramenta com a versão nova. O projeto fica gravado e não é alterado.')],
   'Exportar calendário (.ics)':[_('Exportar calendário'), _('Cria um ficheiro .ics com todos os prazos e objetivos, para importar no Google Calendar, no Apple Calendar ou no Outlook / Teams.')],
   '+ Objetivo de pesquisa':[_('Novo objetivo de pesquisa'), _('Consultar um livro ou mapa, visitar um local, entrevistar alguém, ver um documentário, ouvir um podcast…')],
-  'Eliminar objetivo':[_('Eliminar objetivo'), _('Apaga o objetivo. As Referências associadas mantêm-se.')],
+  'Eliminar objetivo':[_('Eliminar objetivo'), _('Apaga o objetivo, depois de confirmar. As Referências associadas mantêm-se.')],
   'Hoje':[_('Hoje'), _('Volta ao mês atual.')],
   'Ver o mês todo':[_('Ver o mês todo'), _('Volta a mostrar todos os eventos do mês.')],
   'Guardar Projeto':[_('Guardar Projeto'), _('Grava o projeto num ficheiro, com as Referências. No PC (Chrome e Edge), escolhe o sítio uma vez e as gravações seguintes vão para o mesmo ficheiro.')],

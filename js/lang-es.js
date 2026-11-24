@@ -1046,7 +1046,7 @@ I18N.es = {
   "Recarrega a ferramenta com a versão nova. O projeto fica gravado e não é alterado.": "Vuelve a cargar la herramienta con la versión nueva. El proyecto queda guardado y no se modifica.",
   "Exportar calendário": "Exportar calendario",
   "Cria um ficheiro .ics com todos os prazos e objetivos, para importar no Google Calendar, no Apple Calendar ou no Outlook / Teams.": "Crea un archivo .ics con todos los plazos y objetivos, para importarlo en Google Calendar, Apple Calendar u Outlook / Teams.",
-  "Apaga o objetivo. As Referências associadas mantêm-se.": "Borra el objetivo. Las Referencias asociadas se mantienen.",
+  "Apaga o objetivo, depois de confirmar. As Referências associadas mantêm-se.": "Borra el objetivo, después de confirmar. Las Referencias asociadas se mantienen.",
   "Volta ao mês atual.": "Vuelve al mes actual.",
   "Volta a mostrar todos os eventos do mês.": "Vuelve a mostrar todos los eventos del mes.",
   "Grava o projeto num ficheiro, com as Referências. No PC (Chrome e Edge), escolhe o sítio uma vez e as gravações seguintes vão para o mesmo ficheiro.": "Guarda el proyecto en un archivo, con las Referencias. En el PC (Chrome y Edge), elige la ubicación una vez y los siguientes guardados van al mismo archivo.",
@@ -1401,7 +1401,7 @@ I18N.es = {
   "Pesquisa e atalhos": "Búsqueda y atajos",
   "A pesquisa (tecla / ou Ctrl K) procura em todo o projeto — Cenas, Capítulos, Personagens, Localizações, Arcos Narrativos, Referências — e nos Materiais de Apoio, e aceita ações, como «nova personagem» ou «tema claro». A tecla ? mostra os atalhos de teclado e F1 procura só nos Materiais de Apoio.": "La búsqueda (tecla / o Ctrl K) busca en todo el proyecto —Escenas, Capítulos, Personajes, Lugares, Arcos narrativos, Referencias— y en la Guía de escritura, y acepta acciones, como «nuevo personaje» o «tema claro». La tecla ? muestra los atajos de teclado y F1 busca solo en la Guía de escritura.",
   "Anular, refazer e gravação automática": "Deshacer, rehacer y guardado automático",
-  "Mover e eliminar uma coisa de cada vez não pedem confirmação: fica feito e uma barra, em baixo, oferece «Anular». ↶ anula a última alteração e ↷ refaz o que anulou (Ctrl+Z e Ctrl+Shift+Z), até 100 passos — no telemóvel, estão no menu ⋮. Cada alteração fica gravada neste dispositivo no momento em que é feita — o indicador ao lado confirma-o — e está cá quando voltar a abrir a ferramenta. «Guardar Projeto» grava-o também num ficheiro; um ● junto ao nome do projeto indica alterações ainda por guardar em ficheiro.": "Mover y eliminar una sola cosa cada vez no piden confirmación: queda hecho y una barra, abajo, ofrece «Deshacer». ↶ deshace el último cambio y ↷ rehace lo que deshizo (Ctrl+Z y Ctrl+Shift+Z), hasta 100 pasos; en el móvil, están en el menú ⋮. Cada cambio se guarda en este dispositivo en el momento en que se hace (el indicador de al lado lo confirma) y sigue aquí cuando vuelva a abrir la herramienta. «Guardar proyecto» lo guarda también en un archivo; un ● junto al nombre del proyecto indica cambios aún sin guardar en archivo.",
+  "Mover não pede confirmação: fica feito e uma barra, em baixo, oferece «Anular». Eliminar pede sempre confirmação e, depois, a mesma barra ainda oferece «Anular». ↶ anula a última alteração e ↷ refaz o que anulou (Ctrl+Z e Ctrl+Shift+Z), até 100 passos — no telemóvel, estão no menu ⋮. Cada alteração fica gravada neste dispositivo no momento em que é feita — o indicador ao lado confirma-o — e está cá quando voltar a abrir a ferramenta. «Guardar Projeto» grava-o também num ficheiro; um ● junto ao nome do projeto indica alterações ainda por guardar em ficheiro.": "Mover no pide confirmación: queda hecho y una barra, abajo, ofrece «Deshacer». Eliminar pide siempre confirmación y, después, la misma barra aún ofrece «Deshacer». ↶ deshace el último cambio y ↷ rehace lo que deshizo (Ctrl+Z y Ctrl+Shift+Z), hasta 100 pasos; en el móvil, están en el menú ⋮. Cada cambio se guarda en este dispositivo en el momento en que se hace (el indicador de al lado lo confirma) y sigue aquí cuando vuelva a abrir la herramienta. «Guardar proyecto» lo guarda también en un archivo; un ● junto al nombre del proyecto indica cambios aún sin guardar en archivo.",
   "Pare o rato sobre qualquer elemento — um botão, um campo, uma Cena — e aparece uma breve explicação do que faz. Podem desligar-se nas Definições do Projeto.": "Detenga el ratón sobre cualquier elemento (un botón, un campo, una Escena) y aparece una breve explicación de lo que hace. Se pueden desactivar en los Ajustes.",
   "Dois ecrãs": "Dos pantallas",
   "O botão ⧉ abre uma segunda janela para pôr noutro ecrã. A partir daí, as fichas que abrir aqui aparecem lá: o quadro fica sempre à vista e a Cena mostrada fica assinalada. As duas janelas mantêm-se sincronizadas, e o que alterar numa pode ser anulado na outra.": "El botón ⧉ abre una segunda ventana para ponerla en otra pantalla. A partir de ahí, las fichas que abra aquí aparecen allí: el tablero queda siempre a la vista y la Escena mostrada queda señalada. Las dos ventanas se mantienen sincronizadas, y lo que cambie en una se puede deshacer en la otra.",
@@ -1508,5 +1508,12 @@ I18N.es = {
   "Cores": "Colores",
   "Mudar a paleta de cores": "Cambiar la paleta de colores",
   "Claro ou escuro: seguir o sistema": "Claro u oscuro: seguir el sistema",
-  "Escolha as cores da página inicial e dos projetos novos. Cada projeto pode mudar as suas nas Definições.": "Elija los colores de la página inicial y de los proyectos nuevos. Cada proyecto puede cambiar los suyos en Ajustes."
+  "Escolha as cores da página inicial e dos projetos novos. Cada projeto pode mudar as suas nas Definições.": "Elija los colores de la página inicial y de los proyectos nuevos. Cada proyecto puede cambiar los suyos en Ajustes.",
+  "Eliminar a Cena «{nome}»?": "¿Eliminar la Escena «{nome}»?",
+  "Eliminar o Arco Narrativo «{nome}»?": "¿Eliminar el Arco Narrativo «{nome}»?",
+  "Arco Narrativo «{nome}» eliminado.": "Arco Narrativo «{nome}» eliminado.",
+  "Eliminar a Nota «{nome}»?": "¿Eliminar la Nota «{nome}»?",
+  "Eliminar a Referência «{nome}»?": "¿Eliminar la Referencia «{nome}»?",
+  "Eliminar Nota": "Eliminar Nota",
+  "Eliminar o objetivo «{nome}»? As Referências associadas mantêm-se.": "¿Eliminar el objetivo «{nome}»? Las Referencias asociadas se mantienen."
 };

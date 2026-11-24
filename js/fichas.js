@@ -174,10 +174,14 @@ function slideSnap(back, box){
   return {g, r};
 }
 function slidePlay(back, box, snap, dir, from){
-  const br = back.getBoundingClientRect(), {g, r} = snap, s = dir === 'prev' ? 1 : -1, D = r.width + 32;
+  /* carrossel: as duas andam juntas a mesma distância — a que leva a que sai para fora da área visível no instante em que a
+     nova chega ao lugar (num ecrã largo, uma largura da ficha não chegava e a anterior ficava parada à beira, à vista) */
+  const br = back.getBoundingClientRect(), {g, r} = snap, s = dir === 'prev' ? 1 : -1;
+  // «r» é onde a ficha estava à vista (já arrastada pelo dedo, «from»); a conta faz-se a partir do lugar dela, sem o arrasto
+  const vl = Math.max(br.left, 0), vr = Math.min(br.right, innerWidth), D = Math.max(r.width + 32, Math.ceil(s < 0 ? r.right - from - vl : vr - (r.left - from)) + 24);
   Object.assign(g.style, {left:(r.left - br.left - back.clientLeft + back.scrollLeft) + 'px', top:(r.top - br.top - back.clientTop + back.scrollTop) + 'px', width:r.width + 'px', height:r.height + 'px'});
   back.classList.add('sliding'); box.before(g); // a nova ficha (e as setas que ficam paradas) por cima da que sai
-  const o = {duration:Math.round(300 * Math.max(.4, 1 - Math.abs(from) / D)), easing:'cubic-bezier(.22,.8,.25,1)'}, still = [...box.querySelectorAll('.ft-side')];
+  const o = {duration:Math.round(340 * Math.max(.4, 1 - Math.abs(from) / D)), easing:'cubic-bezier(.3,.7,.25,1)'}, still = [...box.querySelectorAll('.ft-side')];
   const fita = box.querySelector('.scn-fita'); if (fita && fitaFixed(fita)) still.push(fita);
   const anims = [g.animate([{transform:'none'}, {transform:'translateX(' + (s * D - from) + 'px)'}], o),
     box.animate([{transform:'translateX(' + (from - s * D) + 'px)'}, {transform:'none'}], o),
@@ -525,7 +529,8 @@ function openArcFicha(id){
       section(_('Localizações'), null, h('div', {class:'chips'}, sceneryLinks(scns), scns.length ? null : h('span', {class:'muted small'}, _('Sem Localizações nas Cenas deste Arco Narrativo.')))),
       refsSection('arc', id, draw),
       h('div', {class:'modal-foot'}, h('button', {class:'btn danger', disabled:!!(arcOwnScenes(id).length || branches.length), title:_('Só é possível eliminar um Arco Narrativo sem Cenas nem Ramos'),
-        onclick:() => { state.arcs = state.arcs.filter(x => x.id !== id); unlinkRefs('arc', id); closeFicha(m); commit(); }}, _('Eliminar Arco Narrativo')),
+        onclick:async () => { const a = arcById(id); if (!a || !await confirmDialog(_('Eliminar o Arco Narrativo «{nome}»?', {nome:a.name}), {title:_('Eliminar Arco Narrativo'), ok:_('Eliminar')})) return;
+          state.arcs = state.arcs.filter(x => x.id !== id); unlinkRefs('arc', id); closeFicha(m); commit(); snack(_('Arco Narrativo «{nome}» eliminado.', {nome:a.name})); }}, _('Eliminar Arco Narrativo')),
         h('button', {class:'btn primary', onclick:() => m.close()}, _('Fechar'))));
   };
   m.redraw = draw; draw();
@@ -706,7 +711,8 @@ function openRefFicha(id){
     add(body,section(_('Associada a'), null, h('div', {class:'chips'},
       r.links.map(l => { const lab = entityLabel(l.kind, l.id); return lab && h('span', {class:'chip click'}, l.kind === 'book' ? bookDot(bookById(l.id)) : null, h('span', {onclick:() => openEntity(l.kind, l.id)}, lab),
         h('button', {class:'chip-x', onclick:() => { r.links = r.links.filter(x => x !== l); touch(); draw(); }}, '✕')); }), linkInp)),
-      h('div', {class:'modal-foot'}, h('button', {class:'btn danger', onclick:() => { const nome = r.title || _('Sem título'), nota = r.type === 'note';
+      h('div', {class:'modal-foot'}, h('button', {class:'btn danger', onclick:async () => { const nome = r.title || _('Sem título'), nota = r.type === 'note';
+          if (!await confirmDialog(nota ? _('Eliminar a Nota «{nome}»?', {nome}) : _('Eliminar a Referência «{nome}»?', {nome}), {title:nota ? _('Eliminar Nota') : _('Eliminar Referência'), ok:_('Eliminar')})) return;
           state.refs = state.refs.filter(x => x.id !== id); /* o ficheiro fica guardado até ao próximo arranque, para se poder anular */ closeFicha(m); commit();
           snack(nota ? _('Nota «{nome}» eliminada.', {nome}) : _('Referência «{nome}» eliminada.', {nome})); }}, _('Eliminar')),
         h('button', {class:'btn primary', onclick:() => m.close()}, _('Fechar'))));

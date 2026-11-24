@@ -183,7 +183,8 @@ function openGoalFicha(id, isNew){
       field(_('Notas'), h('textarea', {class:'inp', value:g.notes, placeholder:_('O que procurar, onde, com quem, o que se quer saber…'), oninput:e => { g.notes = e.target.value; save(); }})),
       ev ? field(_('Calendário'), calLinks(ev)) : null,
       refsSection('goal', id, draw),
-      h('div', {class:'modal-foot'}, h('button', {class:'btn danger', onclick:() => { const nome = g.title || _('Sem título');
+      h('div', {class:'modal-foot'}, h('button', {class:'btn danger', onclick:async () => { const nome = g.title || _('Sem título');
+          if (!await confirmDialog(_('Eliminar o objetivo «{nome}»? As Referências associadas mantêm-se.', {nome}), {title:_('Eliminar objetivo'), ok:_('Eliminar')})) return;
           state.goals = state.goals.filter(x => x.id !== id); state.refs.forEach(r => { r.links = r.links.filter(l => !(l.kind === 'goal' && l.id === id)); }); closeFicha(m); commit();
           snack(_('Objetivo «{nome}» eliminado. As Referências associadas mantêm-se.', {nome})); }}, _('Eliminar objetivo')),
         h('button', {class:'btn primary', onclick:() => m.close()}, _('Fechar'))));

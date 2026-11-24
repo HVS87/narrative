@@ -1046,7 +1046,7 @@ I18N.en = {
   "Recarrega a ferramenta com a versão nova. O projeto fica gravado e não é alterado.": "Reloads the tool with the new version. The project stays saved and isn't changed.",
   "Exportar calendário": "Export calendar",
   "Cria um ficheiro .ics com todos os prazos e objetivos, para importar no Google Calendar, no Apple Calendar ou no Outlook / Teams.": "Creates an .ics file with all deadlines and goals, to import into Google Calendar, Apple Calendar or Outlook / Teams.",
-  "Apaga o objetivo. As Referências associadas mantêm-se.": "Deletes the goal. Linked References are kept.",
+  "Apaga o objetivo, depois de confirmar. As Referências associadas mantêm-se.": "Deletes the goal, after you confirm. Linked References are kept.",
   "Volta ao mês atual.": "Goes back to the current month.",
   "Volta a mostrar todos os eventos do mês.": "Shows all the month's events again.",
   "Grava o projeto num ficheiro, com as Referências. No PC (Chrome e Edge), escolhe o sítio uma vez e as gravações seguintes vão para o mesmo ficheiro.": "Saves the project to a file, with the References. On a PC (Chrome and Edge), you choose the location once and later saves go to the same file.",
@@ -1401,7 +1401,7 @@ I18N.en = {
   "Pesquisa e atalhos": "Search and shortcuts",
   "A pesquisa (tecla / ou Ctrl K) procura em todo o projeto — Cenas, Capítulos, Personagens, Localizações, Arcos Narrativos, Referências — e nos Materiais de Apoio, e aceita ações, como «nova personagem» ou «tema claro». A tecla ? mostra os atalhos de teclado e F1 procura só nos Materiais de Apoio.": "Search (the / key or Ctrl K) looks through the whole project — Scenes, Chapters, Characters, Locations, Story Arcs, References — and the Writing Guide, and accepts actions, such as “new character” or “light theme”. The ? key shows the keyboard shortcuts and F1 searches the Writing Guide only.",
   "Anular, refazer e gravação automática": "Undo, redo and autosave",
-  "Mover e eliminar uma coisa de cada vez não pedem confirmação: fica feito e uma barra, em baixo, oferece «Anular». ↶ anula a última alteração e ↷ refaz o que anulou (Ctrl+Z e Ctrl+Shift+Z), até 100 passos — no telemóvel, estão no menu ⋮. Cada alteração fica gravada neste dispositivo no momento em que é feita — o indicador ao lado confirma-o — e está cá quando voltar a abrir a ferramenta. «Guardar Projeto» grava-o também num ficheiro; um ● junto ao nome do projeto indica alterações ainda por guardar em ficheiro.": "Moving something, or deleting one thing at a time, asks for no confirmation: it is done and a bar at the bottom offers “Undo”. ↶ undoes the last change and ↷ redoes what you undid (Ctrl+Z and Ctrl+Shift+Z), up to 100 steps — on a phone, they're in the ⋮ menu. Every change is saved on this device the moment it's made — the indicator next to it confirms this — and is still here when you open the tool again. “Save Project” also saves it to a file; a ● next to the project name means changes not yet saved to a file.",
+  "Mover não pede confirmação: fica feito e uma barra, em baixo, oferece «Anular». Eliminar pede sempre confirmação e, depois, a mesma barra ainda oferece «Anular». ↶ anula a última alteração e ↷ refaz o que anulou (Ctrl+Z e Ctrl+Shift+Z), até 100 passos — no telemóvel, estão no menu ⋮. Cada alteração fica gravada neste dispositivo no momento em que é feita — o indicador ao lado confirma-o — e está cá quando voltar a abrir a ferramenta. «Guardar Projeto» grava-o também num ficheiro; um ● junto ao nome do projeto indica alterações ainda por guardar em ficheiro.": "Moving asks for no confirmation: it is done and a bar at the bottom offers “Undo”. Deleting always asks for confirmation, and afterwards the same bar still offers “Undo”. ↶ undoes the last change and ↷ redoes what you undid (Ctrl+Z and Ctrl+Shift+Z), up to 100 steps — on a phone, they're in the ⋮ menu. Every change is saved on this device the moment it's made — the indicator next to it confirms this — and is still here when you open the tool again. “Save Project” also saves it to a file; a ● next to the project name means changes not yet saved to a file.",
   "Pare o rato sobre qualquer elemento — um botão, um campo, uma Cena — e aparece uma breve explicação do que faz. Podem desligar-se nas Definições do Projeto.": "Rest the mouse on any element — a button, a field, a Scene — and a short explanation of what it does appears. They can be turned off in Settings.",
   "Dois ecrãs": "Two screens",
   "O botão ⧉ abre uma segunda janela para pôr noutro ecrã. A partir daí, as fichas que abrir aqui aparecem lá: o quadro fica sempre à vista e a Cena mostrada fica assinalada. As duas janelas mantêm-se sincronizadas, e o que alterar numa pode ser anulado na outra.": "The ⧉ button opens a second window to put on another screen. From then on, the details you open here appear there: the board stays in view and the Scene shown is highlighted. The two windows stay in sync, and what you change in one can be undone in the other.",
@@ -1508,5 +1508,12 @@ I18N.en = {
   "Cores": "Colors",
   "Mudar a paleta de cores": "Change the color palette",
   "Claro ou escuro: seguir o sistema": "Light or dark: follow the system",
-  "Escolha as cores da página inicial e dos projetos novos. Cada projeto pode mudar as suas nas Definições.": "Choose the colors of the start page and of new projects. Each project can change its own in Settings."
+  "Escolha as cores da página inicial e dos projetos novos. Cada projeto pode mudar as suas nas Definições.": "Choose the colors of the start page and of new projects. Each project can change its own in Settings.",
+  "Eliminar a Cena «{nome}»?": "Delete the Scene “{nome}”?",
+  "Eliminar o Arco Narrativo «{nome}»?": "Delete the Story Arc “{nome}”?",
+  "Arco Narrativo «{nome}» eliminado.": "Story Arc “{nome}” deleted.",
+  "Eliminar a Nota «{nome}»?": "Delete the Note “{nome}”?",
+  "Eliminar a Referência «{nome}»?": "Delete the Reference “{nome}”?",
+  "Eliminar Nota": "Delete Note",
+  "Eliminar o objetivo «{nome}»? As Referências associadas mantêm-se.": "Delete the goal “{nome}”? Linked References are kept."
 };

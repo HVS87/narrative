@@ -305,7 +305,7 @@ window.__qa = (async () => {
     eq(narrOrder().map(i => state.scenes[i].title), ['a1', 'b1', 'a2', 'a3', 'b2', 'a4'], 'a Ordem Narrativa não muda'); });
   await T('D11 no modo Ordem Narrativa o arrasto na ficha não está ativo', async () => { const f = fx(); openArcFicha(f.A.id); const card = topModal().querySelector('.arc-card'); const r = card.getBoundingClientRect();
     pe('pointerdown', card, r.left + 20, r.top + 20); await W(430); ok(!card.classList.contains('drag')); pe('pointerup', window, 0, 0); });
-  await T('D12 eliminar Arco Narrativo só quando vazio', async () => { const f = fx(); openArcFicha(f.A.id); ok(btn('Eliminar Arco Narrativo').disabled); closeAllModals(); const e = newArc('vazio'); openArcFicha(e.id); ok(!btn('Eliminar Arco Narrativo').disabled); btn('Eliminar Arco Narrativo').click(); eq(state.arcs.length, 2); });
+  await T('D12 eliminar Arco Narrativo só quando vazio', async () => { const f = fx(); openArcFicha(f.A.id); ok(btn('Eliminar Arco Narrativo').disabled); closeAllModals(); const e = newArc('vazio'); openArcFicha(e.id); ok(!btn('Eliminar Arco Narrativo').disabled); btn('Eliminar Arco Narrativo').click(); await W(20); ok(topModal().textContent.includes('Eliminar o Arco Narrativo «vazio»?'), 'pede confirmação'); await answer(false); eq(state.arcs.length, 3, 'cancelar não elimina'); btn('Eliminar Arco Narrativo').click(); await W(20); await answer(true); eq(state.arcs.length, 2); });
   for (const [kind, title, open] of [['scene', 'Cena', f => openSceneFicha(f.a1.id)], ['book', 'Tomo', f => openBookFicha(f.B1.id)], ['arc', 'Arco Narrativo', f => openArcFicha(f.A.id)], ['character', 'Personagem', f => openCharFicha(f.ch.id)]])
     await T('D13 Notas e Referências na ficha de ' + title, async () => { const f = fx(); f.ch = newCharacter('Zé'); const id = { scene:f.a1.id, book:f.B1.id, arc:f.A.id, character:f.ch.id }[kind];
       state.refs.push({ id:'rx', type:'link', title:'Fonte externa', url:'https://example.org', links:[], created:1 }); open(f); const base = modals().length;
@@ -786,7 +786,7 @@ window.__qa = (async () => {
   await T('N04 um item de menu não é acionado pelo clique simulado ao levantar o dedo', async () => { const f = fx(); const el = sceneEl(f.a4.id), rc = el.getBoundingClientRect();
     te('pointerdown', el, rc.left + 20, rc.top + 20); await W(430); te('pointerup', window, rc.left + 20, rc.top + 20); await W(20);
     const del = [...document.querySelectorAll('.ctx-item')].find(x => x.textContent === 'Eliminar Cena'); del.click(); eq(modals().length, 0, 'ainda dentro do intervalo de proteção'); ok(document.querySelector('.ctx-menu'));
-    suppressUntil = 0; del.click(); await W(20); ok(!state.scenes[f.a4.id] && snackEl().textContent.includes('eliminada'), 'eliminar uma Cena não pergunta: avisa e oferece Anular'); });
+    suppressUntil = 0; del.click(); await W(20); ok(topModal() && topModal().textContent.includes('Eliminar a Cena «a4»?'), 'pede confirmação'); await answer(true); ok(!state.scenes[f.a4.id] && snackEl().textContent.includes('eliminada'), 'depois, avisa e oferece Anular'); });
   await T('N05 caneta: o botão lateral é um botão direito; a ponta comporta-se como o dedo', async () => { const f = fx(); const el = sceneEl(f.a1.id), rc = el.getBoundingClientRect();
     el.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true, clientX:rc.left + 5, clientY:rc.top + 5, button:2, pointerId:9, pointerType:'pen'})); eq(lastPtr, 'mouse'); pe('pointerup', window, rc.left + 5, rc.top + 5, 2); ctxAt(el); ok(menuLabels().includes('Eliminar Cena')); closeMenu();
     el.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true, clientX:rc.left + 5, clientY:rc.top + 5, button:0, pointerId:9, pointerType:'pen', isPrimary:true})); eq(lastPtr, 'touch'); cancelPress(); });
@@ -1188,7 +1188,7 @@ window.__qa = (async () => {
     const d = topModal().querySelector('input[type=date]'); d.value = '2030-04-10'; d.dispatchEvent(new Event('change')); await W(10); const tm = topModal().querySelector('input[type=time]'); tm.value = '15:30'; tm.dispatchEvent(new Event('change'));
     eq([g.due, g.time], ['2030-04-10', '15:30']); ok(topModal().querySelector('.cal-links'), 'ligações para os calendários');
     btn('+ Criar Nota', topModal()).click(); await W(20); const note = state.refs[state.refs.length - 1]; eq(note.links, [{kind:'goal', id:g.id}]); ok(topModal().textContent.includes('Objetivo de pesquisa: Entrevistar o faroleiro'), 'a Nota mostra o objetivo');
-    closeAllModals(); openGoalFicha(g.id); ok(topModal().textContent.includes(note.title)); btn('Eliminar objetivo', topModal()).click(); await W(20); await answer(true);
+    closeAllModals(); openGoalFicha(g.id); ok(topModal().textContent.includes(note.title)); btn('Eliminar objetivo', topModal()).click(); await W(20); ok(topModal().textContent.includes('As Referências associadas mantêm-se.') && btn('Cancelar', topModal()), 'pede confirmação'); await answer(true);
     eq(state.goals.length, 0); eq(state.refs.find(r => r.id === note.id).links, [], 'a Nota fica, sem a ligação');
     const g2 = newGoal({kind:'scene', id:f.a1.id}); commit(); deleteScene(f.a1.id); commit(); eq(g2.target, {kind:'project', id:null}, 'Cena eliminada: o objetivo passa logo a geral');
     eq(JSON.stringify(sanitize(JSON.parse(JSON.stringify(state)))), JSON.stringify(state), 'e continua igual depois da normalização'); });
@@ -1376,7 +1376,7 @@ window.__qa = (async () => {
       ok(d.querySelector('#createBtn').offsetParent && !d.querySelector('#bnav').offsetParent); ok(d.querySelector('#projName').offsetWidth > 40, 'o nome do projeto está escondido');
       ok(!d.querySelector('#board-scroll').hidden, 'deitado, a Narrativa é o quadro'); const rl = d.querySelector('#rail'); ok(rl.scrollHeight <= rl.clientHeight + 1, 'a barra lateral não cabe'); }); });
   /* ----- línguas, privacidade, linhas de escrita e revisão, listas de palavras, acessibilidade ----- */
-  const SRC = ['core', 'board', 'fichas', 'tabs', 'nav', 'projects', 'plan', 'device', 'sync', 'update', 'tour', 'tips', 'prefs', 'data', 'i18n'];
+  const SRC = ['core', 'board', 'fichas', 'tabs', 'nav', 'projects', 'plan', 'device', 'sync', 'update', 'tour', 'tips', 'prefs', 'data', 'i18n', 'view', 'find'];
   const txtOf = async f => (await fetch(f, {cache:'no-store'})).text();
   await T('Q01 _(), _n() e _x(): marcadores, plural e contexto; sem dicionário, o português', () => {
     eq(_('Tomo «{nome}»', {nome:'X'}), 'Tomo «X»'); eq(_n(1, '{n} Cena', '{n} Cenas'), '1 Cena'); eq(_n(3, '{n} Cena', '{n} Cenas'), '3 Cenas');
@@ -1457,6 +1457,11 @@ window.__qa = (async () => {
       const an = back._slide.anims; an.forEach(a => { a.pause(); a.currentTime = 0; }); const r0 = box.getBoundingClientRect().left, g0 = g.getBoundingClientRect().left, a0 = q('.ft-side.next').getBoundingClientRect().left;
       an.forEach(a => a.currentTime = 120); const r1 = box.getBoundingClientRect().left, g1 = g.getBoundingClientRect().left, a1 = q('.ft-side.next').getBoundingClientRect().left; an.forEach(a => a.finish());
       ok(r0 > r1 && g0 > g1 && r0 - g0 > box.offsetWidth, 'para a frente: a nova vem da direita e a anterior sai pela esquerda, lado a lado: ' + JSON.stringify([r0, r1, g0, g1])); ok(Math.abs(a0 - a1) < 1, 'a seta não se mexe');
+      ok(Math.abs((r0 - g0) - (r1 - g1)) < 1.5, 'carrossel: as duas andam juntas, à mesma distância uma da outra: ' + JSON.stringify([r0 - g0, r1 - g1]));
+      { const end = an[1].effect.getComputedTiming().duration, br = back.getBoundingClientRect(), vl = Math.max(br.left, 0); an.forEach(a => { a.pause(); a.currentTime = end - 1; });
+        const gr = g.getBoundingClientRect(), nb = box.getBoundingClientRect(), g9 = gr.right; an.forEach(a => a.currentTime = end * .6); const g6 = g.getBoundingClientRect().right;
+        ok(g9 <= vl + 2, 'quando a nova chega ao lugar, a anterior acabou de sair da área visível (não fica parada à beira): ' + JSON.stringify([g9, vl, nb.left]));
+        ok(g6 > vl + 2, 'e não sai antes disso'); an.forEach(a => a.finish()); }
       await W(20); ok(!back.querySelector('.slide-ghost') && !back.classList.contains('sliding'), 'no fim, a cópia sai'); }
     // bifurcação: a linha do Arco divide-se; a seta segue em frente e a Cena do Ramo fica por baixo, na cor do Ramo
     eq(names('.ft-trk.arc .ft-c.next'), ['A carta por abrir', 'Duarte foge de casa*']); ok(q('[data-nav="arc-next"]').classList.contains('fork'), 'a seta mostra a bifurcação');
@@ -1478,7 +1483,7 @@ window.__qa = (async () => {
     ok(q('[data-nav="arc-next"]').disabled); eq(qa('.ft-end').map(x => x.textContent), ['Fim do Arco']);
     // a ficha acompanha o que muda no projeto: ao anular, a fita volta a desenhar-se
     state.scenes.s7.convergeTo = null; commit(); renderAll(); topModal() && openModals[0].redraw(); eq(names('.ft-trk.arc .ft-c.prev'), ['A carta por abrir']);
-    await W(700); ok(!document.querySelector('.slide-ghost, .modal-back.sliding'), 'a animação termina');
+    await W(900); ok(!document.querySelector('.slide-ghost, .modal-back.sliding'), 'a animação termina');
     closeAllModals(); fx(); });
   await T('Q09 ficha da Cena: ← e → percorrem o livro e, com Shift, o Arco Narrativo — não ao escrever, nem com outra janela por cima, nem na visita', async () => {
     state = demoProjectMini(); commit(); renderAll(); closeAllModals(); openSceneFicha('s2'); const box = topModal();
@@ -1585,11 +1590,12 @@ window.__qa = (async () => {
     openSearch(); setInput(inp(), 'nova personagem'); ok(items().includes('Criar Personagem') || items().some(x => /Personagem/.test(x)), 'ação de criar'); setInput(inp(), 'zzzz'); ok(topModal().querySelector('.find-none')); key('Escape'); await W(20); eq(modals().length, 0);
     key('?'); await W(20); ok(document.querySelector('.keys-modal') && topModal().querySelectorAll('.key-row').length >= 15, 'folha de atalhos'); key('Escape'); await W(20);
     key('3'); eq(activeTab, 'books'); key('1'); eq(activeTab, 'board'); key('n'); await W(20); ok(topModal().textContent.includes('Nova Cena'), 'N abre «Nova Cena»'); const ti = topModal().querySelector('input'); key('2', {}, ti); eq(activeTab, 'board', 'a escrever, as teclas não são atalhos'); closeAllModals(); });
-  await T('R07 barra com «Anular»: eliminar uma Cena, uma Nota ou um objetivo não pergunta; o que leva outras coisas consigo continua a perguntar', async () => { const f = fx();
-    openSceneFicha(f.a4.id); btn('Eliminar Cena').click(); await W(20); eq(modals().length, 0, 'sem pergunta, e a ficha fecha'); ok(!state.scenes[f.a4.id]); ok(snackEl().textContent.includes('Cena «a4» eliminada') && tipFor(snackEl().querySelector('.snack-undo')));
+  await T('R07 eliminar pergunta sempre, e depois a barra em baixo oferece «Anular»', async () => { const f = fx();
+    openSceneFicha(f.a4.id); btn('Eliminar Cena').click(); await W(20); ok(topModal().textContent.includes('Eliminar a Cena «a4»?'), 'pergunta'); await answer(false); ok(state.scenes[f.a4.id] && modals().length === 1, 'cancelar: a Cena fica, e a ficha também');
+    btn('Eliminar Cena').click(); await W(20); await answer(true); eq(modals().length, 0, 'confirmado, a ficha fecha'); ok(!state.scenes[f.a4.id]); ok(snackEl().textContent.includes('Cena «a4» eliminada') && tipFor(snackEl().querySelector('.snack-undo')));
     snackEl().querySelector('.snack-undo').click(); await W(30); ok(state.scenes[f.a4.id] && !snackEl(), 'Anular repõe a Cena');
-    const n = newNote(); n.title = 'Lembrete'; commit(); openRefFicha(n.id); btn('Eliminar', topModal()).click(); await W(20); eq(state.refs.length, 0); ok(snackEl().textContent.includes('Nota «Lembrete» eliminada'));
-    const c0 = {id:uid('c'), name:'Vazio', scenes:[]}; state.books[0].chapters.push(c0); commit(); askDeleteChapter(c0.id); await W(20); eq(modals().length, 0, 'um Capítulo vazio sai sem pergunta'); ok(snackEl().textContent.includes('Capítulo «Vazio» eliminado'));
+    const n = newNote(); n.title = 'Lembrete'; commit(); openRefFicha(n.id); btn('Eliminar', topModal()).click(); await W(20); ok(topModal().textContent.includes('Eliminar a Nota «Lembrete»?')); await answer(true); eq(state.refs.length, 0); ok(snackEl().textContent.includes('Nota «Lembrete» eliminada'));
+    const c0 = {id:uid('c'), name:'Vazio', scenes:[]}; state.books[0].chapters.push(c0); commit(); askDeleteChapter(c0.id); await W(20); ok(topModal() && topModal().textContent.includes('Eliminar o Capítulo «Vazio»?'), 'mesmo vazio, um Capítulo pergunta'); await answer(true); ok(snackEl().textContent.includes('Capítulo «Vazio» eliminado'));
     askDeleteChapter(state.books[0].chapters[0].id); await W(20); ok(topModal() && topModal().textContent.includes('e as suas 3 Cenas?'), 'com Cenas, pergunta'); await answer(false);
     const s1 = state.books[0].chapters[0].scenes[0]; deleteScene(s1); commit(); snack('x'); const b = snackEl().querySelector('.snack-undo'); state.project.name = 'Outro'; commit(); b.click(); await W(20); eq(state.project.name, 'Outro', 'depois de outra alteração, o botão da barra já não anula'); ok(!state.scenes[s1]); });
   await T('R08 ficha ao lado: painel à direita, quadro utilizável, Cena aberta assinalada; por omissão, a janela ao centro', async () => { const f = fx(); const ana = newCharacter('Ana'); f.a1.chars.push(ana.id); commit();
@@ -1847,6 +1853,93 @@ window.__qa = (async () => {
       btn('Começar').click(); await W(20); eq(modals().length, 0);
       ok(TOUR_DEEP.some(x => /botão das cores/.test(x.text)), 'a visita detalhada fala do botão');
     } finally { back(LS_THEME, th0); back(LS_PAL, pal0); lsSet(LS_PRIV, '1'); state.project.palette = {h:220, mode:'dark'}; applyPalette(); closeAllModals(); fx(); } });
+  /* ----- 1.0.7: eliminar pede sempre confirmação; carrossel entre Cenas; paletas na página inicial (casos-limite) ----- */
+  /* a pergunta tem de existir mesmo — sem o atalho de «answer», que aceita a barra «Anular» no lugar dela */
+  const delAsk = async (fire, alive, what, o) => { o = o || {}; fire(); await W(30); const m = topModal(), okB = m && m.querySelector('.modal-foot .btn.primary');
+    ok(m && btn('Cancelar', m) && okB && okB.textContent === 'Eliminar', what + ': não perguntou'); if (!m || !okB) return;
+    if (o.txt) ok(m.textContent.includes(o.txt), what + ': o texto devia dizer «' + o.txt + '»: ' + m.textContent);
+    btn('Cancelar', m).click(); await W(30); ok(alive(), what + ': Cancelar eliminou');
+    fire(); await W(30); ok(topModal() && btn('Cancelar', topModal()), what + ': pergunta outra vez'); key('Escape'); await W(30); ok(alive(), what + ': Esc eliminou'); ok(!(topModal() && btn('Cancelar', topModal())), what + ': Esc fecha a pergunta');
+    if (o.keep) return; fire(); await W(30); topModal().querySelector('.modal-foot .btn.primary').click(); await W(40); ok(!alive(), what + ': confirmado, não eliminou'); };
+  await T('AA01 eliminar: todas as fichas pedem confirmação, e Cancelar ou Esc deixam tudo como estava (e a ficha aberta)', async () => { const f = fx();
+    const ficha = async (open, label, alive, what, txt) => { closeAllModals(); open(); await W(30); const box = topModal();
+      await delAsk(() => btn(label, box).click(), alive, what, {txt, keep:true}); ok(modals().length === 1 && topModal() === box, what + ': a ficha continua aberta');
+      btn(label, box).click(); await W(30); topModal().querySelector('.modal-foot .btn.primary').click(); await W(40); ok(!alive(), what + ': confirmado, eliminou'); ok(!modals().includes(box), what + ': e a ficha fecha'); };
+    await ficha(() => openSceneFicha(f.a2.id), 'Eliminar Cena', () => !!state.scenes[f.a2.id], 'Cena', 'Eliminar a Cena «a2»?');
+    const c = newCharacter('Rui'); commit(); await ficha(() => openCharFicha(c.id), 'Eliminar Personagem', () => !!charById(c.id), 'Personagem', '«Rui»');
+    const sc = newScenery('Farol'); commit(); await ficha(() => openSceneryFicha(sc.id), 'Eliminar Localização', () => state.sceneries.some(x => x.id === sc.id), 'Localização', '«Farol»');
+    const ar = newArc('Vazio'); commit(); await ficha(() => openArcFicha(ar.id), 'Eliminar Arco Narrativo', () => !!arcById(ar.id), 'Arco Narrativo', 'Eliminar o Arco Narrativo «Vazio»?');
+    const n = newNote(); n.title = 'Ideia'; commit(); await ficha(() => openRefFicha(n.id), 'Eliminar', () => state.refs.some(r => r.id === n.id), 'Nota', 'Eliminar a Nota «Ideia»?');
+    const lk = {id:uid('r'), type:'link', title:'Mapa', url:'https://example.org', text:'', links:[], created:Date.now()}; state.refs.push(lk); commit();
+    await ficha(() => openRefFicha(lk.id), 'Eliminar', () => state.refs.some(r => r.id === lk.id), 'Referência', 'Eliminar a Referência «Mapa»?');
+    const g = newGoal(); g.title = 'Visitar o cais'; commit(); await ficha(() => openGoalFicha(g.id), 'Eliminar objetivo', () => state.goals.some(x => x.id === g.id), 'objetivo', 'Eliminar o objetivo «Visitar o cais»?');
+    await ficha(() => openBookFicha(f.B2.id), 'Eliminar Tomo', () => !!bookById(f.B2.id), 'Tomo', '«Tomo 2»');
+    closeAllModals(); fx(); });
+  await T('AA02 eliminar: os menus do quadro e da Lista também perguntam — Cena, Capítulo (mesmo vazio) e Tomo', async () => { const f = fx(); closeAllModals(); setTab('board'); renderAll(); await W(30); lastPtr = 'mouse'; ok(sceneEl(f.a1.id) && chHead(f.c2.id) && bkHead(f.B2.id), 'o quadro está à vista: ' + JSON.stringify({tab:activeTab, list:!!document.querySelector('.nl-frontier, .nlist')}));
+    const ctx = (el, w) => { ok(el, 'sem elemento no quadro: ' + w); if (!el) return; const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', {bubbles:true, cancelable:true, clientX:r.left + 12, clientY:r.top + 10, button:2})); };
+    const item = label => { const it = [...document.querySelectorAll('.ctx-item')].find(x => x.textContent === label); ok(it, 'sem «' + label + '» no menu: ' + menuLabels()); suppressUntil = 0; it && it.click(); };
+    await delAsk(() => { ctx(sceneEl(f.a1.id), 'a1'); item('Eliminar Cena'); }, () => !!state.scenes[f.a1.id], 'Cena (quadro)', {txt:'Eliminar a Cena «a1»?'});
+    ok(snackEl() && snackEl().querySelector('.snack-undo'), 'depois de eliminar, a barra oferece Anular'); snackEl().querySelector('.snack-undo').click(); await W(30); ok(state.scenes[f.a1.id], 'Anular repõe a Cena'); renderAll(); await W(20);
+    await delAsk(() => { ctx(chHead(f.c2.id), 'c2'); item('Eliminar Capítulo'); }, () => !!findChapter(f.c2.id), 'Capítulo (quadro)', {txt:'e a sua Cena?'});
+    const c0 = {id:uid('c'), name:'Oco', scenes:[]}; bookById(f.B1.id).chapters.push(c0); commit(); renderAll(); await W(20); // depois de Anular, o estado é outro objeto
+    await delAsk(() => { ctx(chHead(c0.id), 'c0'); item('Eliminar Capítulo'); }, () => !!findChapter(c0.id), 'Capítulo vazio (quadro)', {txt:'Eliminar o Capítulo «Oco»?'});
+    await delAsk(() => { ctx(bkHead(f.B2.id), 'B2'); item('Eliminar Tomo'); }, () => !!bookById(f.B2.id), 'Tomo (quadro)', {txt:'«Tomo 2»', keep:true});
+    await delAsk(() => { sceneListMenu(f.a2.id, 200, 200); item('Eliminar Cena'); }, () => !!state.scenes[f.a2.id], 'Cena (Lista)', {keep:true});
+    const fake = h('button'); document.body.append(fake);
+    await delAsk(() => { chapterListMenu(f.c1.id, fake); item('Eliminar Capítulo'); }, () => !!findChapter(f.c1.id), 'Capítulo (Lista)', {keep:true});
+    await delAsk(() => { bookListMenu(f.B1.id, fake); item('Eliminar Tomo'); }, () => !!bookById(f.B1.id), 'Tomo (Lista)', {keep:true}); fake.remove();
+    // em inglês, a pergunta também vem traduzida (e com os mesmos marcadores)
+    const box = {}; new Function('I18N', await (await fetch('js/lang-en.js')).text())(box); eq(box.en['Eliminar a Cena «{nome}»?'], 'Delete the Scene “{nome}”?');
+    closeAllModals(); fx(); });
+  await T('AA03 carrossel entre Cenas: para trás, na ficha ao lado do quadro e com o dedo — as duas andam juntas e a que sai acaba fora da vista quando a outra chega', async () => {
+    state = demoProjectMini(); commit(); renderAll(); closeAllModals();
+    const probe = async (dir, what) => { const box = topModal(), back = box.closest('.modal-back'), s = back._slide; ok(s, what + ': sem passagem deslizante'); if (!s) return;
+      const end = s.anims[1].effect.getComputedTiming().duration, br = back.getBoundingClientRect(), vl = Math.max(br.left, 0), vr = Math.min(br.right, innerWidth), gaps = [];
+      for (const t of [0, .25, .5, .75]){ s.anims.forEach(a => { a.pause(); a.currentTime = end * t; }); gaps.push(box.getBoundingClientRect().left - s.g.getBoundingClientRect().left); }
+      ok(Math.max(...gaps) - Math.min(...gaps) < 1.5, what + ': a distância entre as duas não muda: ' + JSON.stringify(gaps.map(Math.round)));
+      ok(dir === 'next' ? gaps[0] > 0 : gaps[0] < 0, what + ': a nova vem do lado certo');
+      s.anims.forEach(a => a.currentTime = end - 1); const gr = s.g.getBoundingClientRect();
+      ok(dir === 'next' ? gr.right <= vl + 2 : gr.left >= vr - 2, what + ': no fim, a que sai está fora da área visível: ' + JSON.stringify([gr.left, gr.right, vl, vr]));
+      s.anims.forEach(a => a.currentTime = end * .5); const gm = s.g.getBoundingClientRect(); ok(gm.right > vl + 2 && gm.left < vr - 2, what + ': a meio, ainda se vê');
+      s.anims.forEach(a => a.finish()); await W(20); ok(!back.querySelector('.slide-ghost'), what + ': a cópia sai no fim'); };
+    openSceneFicha('s3'); await W(30); topModal().querySelector('[data-nav="narr-prev"]').click(); await W(10); await probe('prev', 'para trás');
+    topModal().querySelector('[data-nav="narr-next"]').click(); await W(10); await probe('next', 'para a frente');
+    // com o dedo: a nova continua de onde o dedo largou a anterior, sem salto
+    { const box = topModal(), el = box.querySelector('.ficha textarea'), P = (type, x) => el.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true, pointerType:'touch', isPrimary:true, pointerId:7, clientX:x, clientY:300}));
+      P('pointerdown', 400); for (let i = 1; i <= 8; i++){ P('pointermove', 400 - i * 25); await W(8); } await W(30); const x0 = box.getBoundingClientRect().left; ok(x0 < box.closest('.modal-back').getBoundingClientRect().left + 200, 'a caixa segue o dedo'); P('pointerup', 200); await W(5);
+      const s = box.closest('.modal-back')._slide; ok(s, 'o gesto passou de Cena'); if (s){ s.anims.forEach(a => { a.pause(); a.currentTime = 0; }); ok(Math.abs(s.g.getBoundingClientRect().left - x0) < 3, 'a que sai parte de onde o dedo a deixou, sem salto: ' + [s.g.getBoundingClientRect().left, x0]); }
+      await probe('next', 'com o dedo'); }
+    ok(innerWidth < 1100 || dockable(), 'numa janela larga, a ficha pode ir para o lado: ' + innerWidth);
+    if (dockable()){ closeAllModals(); setDockPref(true); try { openSceneFicha('s2'); await W(40); ok($('.modal-back.docked'), 'ficha ao lado');
+        topModal().querySelector('[data-nav="narr-next"]').click(); await W(10); await probe('next', 'ao lado do quadro');
+        topModal().querySelector('[data-nav="narr-prev"]').click(); await W(10); await probe('prev', 'ao lado do quadro, para trás'); } finally { closeAllModals(); setDockPref(false); } }
+    // movimento reduzido: troca logo, sem cópia
+    document.body.classList.add('reduce-motion'); try { openSceneFicha('s2'); await W(20); topModal().querySelector('[data-nav="narr-next"]').click(); await W(10); ok(!document.querySelector('.slide-ghost'), 'com animações reduzidas, não desliza'); } finally { document.body.classList.remove('reduce-motion'); applyA11y(); }
+    closeAllModals(); fx(); });
+  await T('AA04 paletas: teclado no menu das cores, modelos e exemplo com a paleta escolhida, e as Definições lembram-na para a página inicial', async () => {
+    const th0 = lsGet(LS_THEME), pal0 = lsGet(LS_PAL), back = (k, v) => v == null ? localStorage.removeItem(k) : lsSet(k, v);
+    try {
+      lsSet(LS_THEME, 'dark'); lsSet(LS_PAL, '345'); closeProject(); await W(20); if (modals().length){ const b = btn('Fechar sem guardar', topModal()); b && b.click(); await W(40); }
+      ok(projNone()); eq(state.project.palette.h, 345, 'a página inicial abre com a paleta lembrada'); eq(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(), paletteVars({h:345, mode:'dark'})['--bg']);
+      const pb = $('#palBtn'); pb.focus(); pb.click(); await W(10); const its = [...document.querySelectorAll('.pal-menu .ctx-item')];
+      eq(document.activeElement, its[0], 'o foco vai para a primeira paleta'); eq(pb.getAttribute('aria-expanded'), 'true');
+      ok($('.pal-menu .pal-item.on') && $('.pal-menu .pal-item.on').textContent.includes('Vinho'), 'a lembrada vem assinalada');
+      key('ArrowDown', {}, document.querySelector('.pal-menu')); eq(document.activeElement, its[1], 'setas percorrem as paletas');
+      key('Escape', {}, document.querySelector('.pal-menu')); await W(10); ok(!$('.pal-menu'), 'Esc fecha'); eq(pb.getAttribute('aria-expanded'), 'false'); eq(document.activeElement, pb, 'e o foco volta ao botão');
+      pb.click(); await W(10); [...document.querySelectorAll('.pal-menu .ctx-item')].find(i => i.textContent.includes('Âmbar')).click(); await W(10); eq(lsGet(LS_PAL), '35');
+      templateDialog(); await W(20); topModal().querySelector('.tpl-item').click(); await W(40); ok(!projNone()); eq(state.project.palette.h, 35, 'um modelo fica com a paleta escolhida');
+      setTab('settings'); await W(20); [...document.querySelectorAll('.pal')].find(p => p.textContent.includes('Menta')).click(); await W(10); eq(lsGet(LS_PAL), '165', 'escolher nas Definições também fica para a página inicial');
+      closeProject(); await W(20); if (modals().length){ const b = btn('Fechar sem guardar', topModal()); b && b.click(); await W(40); } ok(projNone()); eq(state.project.palette.h, 165, 'e a página inicial passa a abrir com ela');
+      startExample(); await W(40); eq(state.project.palette.h, 165, 'o exemplo também');
+      ok(getComputedStyle($('#palBtn')).display === 'none' && getComputedStyle($('#langBtn')).display === 'none', 'com projeto aberto, os dois botões saem da barra');
+    } finally { back(LS_THEME, th0); back(LS_PAL, pal0); state.project.palette = {h:220, mode:'dark'}; applyPalette(); closeAllModals(); setTab('board'); fx(); } });
+  await T('AA05 página inicial no telemóvel: cores, língua e ajuda cabem na barra, com toque de tamanho certo; o menu das cores cabe no ecrã', async () => {
+    await phone(360, 740, async (w, d) => { w.eval('Projects.idx.active = null; projActivate(null)'); await W(80);
+      ok(d.body.classList.contains('no-project'), 'página inicial'); const bs = ['#palBtn', '#langBtn', '#tourBtn'].map(s => d.querySelector(s)), rs = bs.map(b => b.getBoundingClientRect());
+      rs.forEach((r, i) => ok(r.width >= 32 && r.height >= 32 && r.right <= 360 && r.left >= 0, 'à vista e com tamanho para o dedo: ' + bs[i].id + ' ' + JSON.stringify([r.left, r.right, r.width])));
+      ok(rs[0].right <= rs[1].left + 1 && rs[1].right <= rs[2].left + 1, 'sem se sobreporem'); const tb = d.querySelector('#topbar'); ok(tb.scrollWidth <= tb.clientWidth + 1, 'a barra não transborda');
+      bs[0].click(); await W(30); const m = d.querySelector('.pal-menu'); ok(m, 'o menu abre'); const mr = m.getBoundingClientRect(); ok(mr.left >= 0 && mr.right <= 360 && mr.bottom <= 740, 'e cabe no ecrã: ' + JSON.stringify([mr.left, mr.right, mr.bottom]));
+      w.closeMenu(); }); });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };
