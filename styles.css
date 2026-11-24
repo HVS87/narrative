@@ -471,6 +471,7 @@ body.dragging .board-hint{display:none}
 /* ---------- áreas seguras (entalhe, cantos e barra de gestos) ---------- */
 #topbar{padding-top:max(8px,env(safe-area-inset-top));padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
 #view-page{padding-left:max(32px,env(safe-area-inset-left));padding-right:max(32px,env(safe-area-inset-right));padding-bottom:calc(60px + env(safe-area-inset-bottom));overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+body.panning,body.panning *{cursor:grabbing!important;user-select:none}
 #board-scroll{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 #toasts{bottom:calc(22px + env(safe-area-inset-bottom));width:max-content;max-width:calc(100vw - 24px)}
 #board,.arc-row{-webkit-touch-callout:none}
@@ -805,17 +806,11 @@ body.no-project #langBtn{display:inline-flex;align-items:center;justify-content:
 .ft-side .ft-arrow .nic svg{width:22px;height:22px}
 .ft-side .ft-arrow.narr{width:44px;height:44px}
 .ft-side .ft-arrow.narr .nic svg{width:26px;height:26px}
-/* ao passar a outra Cena, a caixa da ficha desliza do lado de onde se vem; as setas ficam paradas, para se poder clicar de seguida */
-.modal.slide-next{animation:ficha-next .22s cubic-bezier(.2,.8,.2,1)}
-.modal.slide-prev{animation:ficha-prev .22s cubic-bezier(.2,.8,.2,1)}
-.slide-next .ft-arrow{animation:ft-hold-next .22s cubic-bezier(.2,.8,.2,1)}
-.slide-prev .ft-arrow{animation:ft-hold-prev .22s cubic-bezier(.2,.8,.2,1)}
-:is(.slide-next,.slide-prev) :is(.modal-head,.ficha,.ft-c,.ft-here){animation:ficha-fade .22s ease-out}
-@keyframes ficha-next{from{transform:translateX(20px)}}
-@keyframes ficha-prev{from{transform:translateX(-20px)}}
-@keyframes ft-hold-next{from{translate:-20px 0}}
-@keyframes ft-hold-prev{from{translate:20px 0}}
-@keyframes ficha-fade{from{opacity:.3}}
+/* ao passar a outra Cena, a ficha que se deixa sai para um lado e a nova entra do outro (js: slidePlay); as setas ficam paradas */
+.modal-back.sliding{overflow-x:hidden}
+.modal.slide-ghost{position:absolute;margin:0;animation:none;pointer-events:none;transform:none}
+/* ecrã tátil: o gesto de deslizar para o lado é da ficha; o de cima para baixo continua a deslocar a janela */
+.modal.scene-modal{touch-action:pan-y pinch-zoom}
 /* telemóvel: a fita, com as setas nas pontas, fica fixa em baixo, junto do polegar */
 @media (max-width:699px), (max-height:520px) and (orientation:landscape){
   .modal.scene-modal{display:flex;flex-direction:column;padding-bottom:0}
@@ -959,8 +954,6 @@ body.no-project .search-pill{display:none}
 .dock-btn[aria-pressed="true"]{color:var(--accent)}
 .modal-back.docked{left:auto;right:0;top:var(--top-h,56px);bottom:0;width:var(--dock-w);padding:0;background:var(--surface);border-left:1px solid var(--border);box-shadow:-10px 0 24px -14px var(--shadow);z-index:450;display:block;overflow:auto}
 .modal-back.docked .modal{width:100%;max-width:none;min-height:100%;border:0;border-radius:0;box-shadow:none;animation:none}
-.modal-back.docked .modal.slide-next{animation:ficha-next .22s cubic-bezier(.2,.8,.2,1)}
-.modal-back.docked .modal.slide-prev{animation:ficha-prev .22s cubic-bezier(.2,.8,.2,1)}
 body.dock-on #shell{padding-right:var(--dock-w)}
 body.dock-on #toasts{left:calc((100% - var(--dock-w)) / 2)}
 .ref-ic{color:var(--muted);vertical-align:-4px;margin-right:4px}

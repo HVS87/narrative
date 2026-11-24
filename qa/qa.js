@@ -59,7 +59,7 @@ window.__qa = (async () => {
     else { if (idx === 0) x = B.GUT + 3; else { const p = bl.pos['b:' + base[idx - 1].id]; x = p.x + p.w / 2 + 6; } }
     return x + $('#board').getBoundingClientRect().left;
   }
-  const modals = () => [...document.querySelectorAll('.modal')];
+  const modals = () => [...document.querySelectorAll('.modal:not(.slide-ghost)')]; // a cópia da ficha que sai ao deslizar entre Cenas não conta
   const topModal = () => modals()[modals().length - 1];
   const btn = (text, root) => [...(root || topModal()).querySelectorAll('button,a.btn')].find(b => b.textContent.includes(text));
   const snackEl = () => document.querySelector('.toast.snack');
@@ -1451,7 +1451,13 @@ window.__qa = (async () => {
     ok(q('.scn-fita').offsetHeight <= 100, 'a fita, com as duas legendas, ocupa pouco: ' + q('.scn-fita').offsetHeight + ' px');
     q('[data-nav="narr-next"]').click(); await W(20);
     ok(topModal() === box && modals().length === 1, 'é a mesma ficha, não uma nova'); eq(title(), 'A casa da avó'); eq(openModals[0].entity, {kind:'scene', id:'s2'}); eq(document.activeElement.dataset.nav, 'narr-next', 'o foco fica na seta');
-    ok(box.classList.contains('slide-next'), 'a caixa desliza'); eq(getComputedStyle(box).animationName, 'ficha-next'); eq(getComputedStyle(q('[data-nav="narr-next"]')).animationName, 'ft-hold-next', 'as setas ficam paradas');
+    { const back = box.closest('.modal-back'), g = back.querySelector('.slide-ghost'); ok(g && g.inert && g.querySelector('.ficha input').value === 'Inês desembarca na ilha', 'a Cena anterior sai para o lado, com o que lá estava'); ok(!g.querySelector('.ft-sides') && !g.querySelector('[id]'), 'a cópia não leva as setas nem ids');
+      ok(back.classList.contains('sliding') && box.getAnimations().some(a => !(window.CSSAnimation && a instanceof CSSAnimation)), 'a nova entra do outro lado, sem recomeçar a animação de abertura (era o que fazia piscar)');
+      eq(getComputedStyle(box).animationName, 'pop'); ok(q('.ft-side.next').getAnimations().length > 0, 'as setas fazem o movimento contrário: ficam paradas no ecrã');
+      const an = back._slide.anims; an.forEach(a => { a.pause(); a.currentTime = 0; }); const r0 = box.getBoundingClientRect().left, g0 = g.getBoundingClientRect().left, a0 = q('.ft-side.next').getBoundingClientRect().left;
+      an.forEach(a => a.currentTime = 120); const r1 = box.getBoundingClientRect().left, g1 = g.getBoundingClientRect().left, a1 = q('.ft-side.next').getBoundingClientRect().left; an.forEach(a => a.finish());
+      ok(r0 > r1 && g0 > g1 && r0 - g0 > box.offsetWidth, 'para a frente: a nova vem da direita e a anterior sai pela esquerda, lado a lado: ' + JSON.stringify([r0, r1, g0, g1])); ok(Math.abs(a0 - a1) < 1, 'a seta não se mexe');
+      await W(20); ok(!back.querySelector('.slide-ghost') && !back.classList.contains('sliding'), 'no fim, a cópia sai'); }
     // bifurcação: a linha do Arco divide-se; a seta segue em frente e a Cena do Ramo fica por baixo, na cor do Ramo
     eq(names('.ft-trk.arc .ft-c.next'), ['A carta por abrir', 'Duarte foge de casa*']); ok(q('[data-nav="arc-next"]').classList.contains('fork'), 'a seta mostra a bifurcação');
     { const bg = getComputedStyle(q('[data-nav="arc-next"]')).backgroundImage; ok(/gradient/.test(bg) && bg.includes(cssColor(arcColor(arcById('a1')))) && bg.includes(cssColor(arcColor(arcById('a3')))), 'na bifurcação, a seta mistura as cores dos dois Arcos: ' + bg);
@@ -1462,7 +1468,7 @@ window.__qa = (async () => {
     q('[data-nav="arc-next"]').click(); await W(20); eq(title(), 'A casa da avó', 'a seta não escolhe sozinha'); eq(menuLabels(), ['A carta por abrir · O regresso de Inês', 'Duarte foge de casa · A fuga de Duarte']);
     ok(document.activeElement && document.activeElement.classList.contains('ctx-item'), 'o foco vai para o menu');
     document.querySelectorAll('.ctx-item')[0].click(); await W(20); eq(title(), 'A carta por abrir', 'continuar no Arco'); eq(document.activeElement.dataset.nav, 'arc-next', 'o foco volta à seta usada');
-    q('[data-nav="arc-prev"]').click(); await W(20); eq(title(), 'A casa da avó'); ok(box.classList.contains('slide-prev'), 'para trás, desliza do outro lado');
+    q('[data-nav="arc-prev"]').click(); await W(20); eq(title(), 'A casa da avó'); { const g = box.closest('.modal-back').querySelector('.slide-ghost'), an = box.closest('.modal-back')._slide.anims; an.forEach(a => { a.pause(); a.currentTime = 0; }); ok(box.getBoundingClientRect().left < g.getBoundingClientRect().left, 'para trás, a nova vem da esquerda'); an.forEach(a => a.finish()); }
     q('[data-nav="arc-next-1"]').click(); await W(20); eq(title(), 'Duarte foge de casa', 'a Cena da fita leva ao Ramo'); eq(document.activeElement.dataset.nav, 'arc-next');
     ok(q('[data-nav="arc-prev"]').classList.contains('fork')); eq(names('.ft-trk.arc .ft-c.prev'), ['A casa da avó']); eq(getComputedStyle(q('[data-nav="arc-next"]')).backgroundColor, cssColor(arcColor(arcById('a3'))));
     q('[data-nav="arc-next"]').click(); await W(20); eq(title(), 'Noite no cais', 'com um só caminho, a seta vai direta'); ok(q('[data-nav="arc-next"]').classList.contains('merge'), 'a seta mostra a convergência'); ok(/gradient/.test(getComputedStyle(q('[data-nav="arc-next"]')).backgroundImage), 'e mistura as cores');
@@ -1472,7 +1478,7 @@ window.__qa = (async () => {
     ok(q('[data-nav="arc-next"]').disabled); eq(qa('.ft-end').map(x => x.textContent), ['Fim do Arco']);
     // a ficha acompanha o que muda no projeto: ao anular, a fita volta a desenhar-se
     state.scenes.s7.convergeTo = null; commit(); renderAll(); topModal() && openModals[0].redraw(); eq(names('.ft-trk.arc .ft-c.prev'), ['A carta por abrir']);
-    await W(560); ok(!box.classList.contains('slide-next') && !box.classList.contains('slide-prev'), 'a animação termina');
+    await W(700); ok(!document.querySelector('.slide-ghost, .modal-back.sliding'), 'a animação termina');
     closeAllModals(); fx(); });
   await T('Q09 ficha da Cena: ← e → percorrem o livro e, com Shift, o Arco Narrativo — não ao escrever, nem com outra janela por cima, nem na visita', async () => {
     state = demoProjectMini(); commit(); renderAll(); closeAllModals(); openSceneFicha('s2'); const box = topModal();
@@ -1483,7 +1489,7 @@ window.__qa = (async () => {
     ok(!key('ArrowRight'), 'com o menu aberto, as setas não mudam de Cena'); eq(title(), 'A casa da avó');
     document.activeElement.click(); await W(20); eq(title(), 'A carta por abrir', 'Shift: pelo Arco'); key('ArrowLeft', {shiftKey:true}); eq(title(), 'A casa da avó');
     key('ArrowLeft'); key('ArrowLeft'); eq(title(), 'Inês desembarca na ilha', 'no início do livro, ← não faz nada');
-    box.classList.remove('slide-next', 'slide-prev'); key('ArrowRight', {repeat:true}); eq(title(), 'A casa da avó'); ok(!box.classList.contains('slide-next'), 'tecla premida: sem animação');
+    slideStop(box.closest('.modal-back')); key('ArrowRight', {repeat:true}); eq(title(), 'A casa da avó'); ok(!document.querySelector('.slide-ghost') && !box.getAnimations().some(a => !(window.CSSAnimation && a instanceof CSSAnimation)), 'tecla premida: sem animação');
     const inp = box.querySelector('.ficha input'); inp.focus(); ok(!key('ArrowLeft', null, inp), 'num campo de texto, a seta é do texto'); ok(!key('ArrowLeft', null, box.querySelector('.ficha textarea'))); ok(!key('ArrowLeft', null, box.querySelector('.ficha select'))); eq(title(), 'A casa da avó');
     const chk = box.querySelector('.ficha .steps3 button'); ok(chk, 'há botões de estado na ficha'); ok(key('ArrowRight', null, chk), 'num botão, navega'); eq(title(), 'Luz apagada'); key('ArrowLeft');
     ok(!key('ArrowRight', {ctrlKey:true}) && !key('ArrowRight', {altKey:true}), 'com Ctrl ou Alt, não'); eq(title(), 'A casa da avó');
@@ -1791,6 +1797,39 @@ window.__qa = (async () => {
     eq(d.scenes[f.a2.id].prog.review.due, '2031-01-02'); eq(d.plan.write.start, '2031-01-01'); ok(!/"(hidden|f|zoom|dens|calMode|scnRole|planView)":/.test(text), 'filtros, vistas e ampliação não vão para o ficheiro');
     eq(JSON.stringify(sanitize(JSON.parse(JSON.stringify(state)))), JSON.stringify(state), 'normalizar o que se cria durante o uso não muda nada (condição da sincronização)');
     setLocMain(l2, true); eq([l2.main, l2.noMain], [true, undefined], 'marcar como principal limpa o «não sugerir»'); });
+  await T('U01 quadro: premir e arrastar com o rato num espaço vazio desloca-o para o lado; um clique continua a ser um clique', async () => { fx(); state = sanitize(demoProject()); commit(); renderAll(); setTab('board'); await W(30);
+    const sc = $('#board-scroll'); sc.scrollLeft = 0; sc.scrollTop = 0; ok(sc.scrollWidth > sc.clientWidth + 300, 'o quadro é mais largo do que a janela'); const n0 = Object.keys(state.scenes).length;
+    const sr = sc.getBoundingClientRect(), at = (x, y) => document.elementFromPoint(x, y); let x0, y0, empty;
+    for (let y = Math.min(sr.bottom, innerHeight) - 90; y > sr.top + 120 && !empty; y -= 23) for (let x = sr.left + B.GUT * Z() + 40; x < Math.min(sr.right, innerWidth) - 120; x += 37){ const e = at(x, y); if (e && $('#board').contains(e) && !e.closest('.scene, .ch-head, .book-head, button, input')){ x0 = x; y0 = y; empty = e; break; } }
+    ok(empty, 'há espaço vazio no quadro');
+    const P = (type, x, y, b, el) => (el || at(x, y) || document.body).dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true, pointerType:'mouse', isPrimary:true, pointerId:1, button:type === 'pointermove' ? -1 : 0, buttons:b, clientX:x, clientY:y}));
+    P('pointerdown', x0, y0, 1, empty); P('pointermove', x0 - 3, y0, 1); eq(sc.scrollLeft, 0, 'um tremor não desloca'); ok(!document.body.classList.contains('panning'));
+    for (let i = 1; i <= 10; i++) P('pointermove', x0 - i * 30, y0, 1); eq(sc.scrollLeft, 300, 'o quadro segue o rato'); ok(document.body.classList.contains('panning'), 'com a mão fechada'); eq(getComputedStyle(sc).cursor, 'grabbing');
+    P('pointerup', x0 - 300, y0, 0, window); empty.click(); await W(20); ok(!document.body.classList.contains('panning')); eq(Object.keys(state.scenes).length, n0, 'largar não cria uma Cena'); eq(modals().length, 0, 'nem abre nada');
+    P('pointerdown', x0, y0, 1, empty); P('pointermove', x0 + 100, y0, 1); eq(sc.scrollLeft, 200, 'e para o outro lado'); P('pointermove', x0 + 100, y0, 0); ok(!document.body.classList.contains('panning'), 'botão largado fora da janela: acaba');
+    P('pointermove', x0 + 200, y0, 0); eq(sc.scrollLeft, 200); P('pointerup', x0, y0, 0, window); await W(10);
+    sc.scrollLeft = 0; await W(10); const s1 = sceneEl('s1'), b = s1.getBoundingClientRect();
+    P('pointerdown', b.left + 20, b.top + 10, 1, s1); P('pointermove', b.left + 20, b.top + 10, 1); eq(sc.scrollLeft, 0, 'numa Cena, premir não desloca o quadro'); P('pointerup', b.left + 20, b.top + 10, 0, window); cancelDrags(); await W(10);
+    P('pointerdown', x0, y0, 1, empty); P('pointerup', x0, y0, 0, window); ok(!document.body.classList.contains('panning'), 'clique sem arrastar: nada a deslocar'); eq(sc.scrollLeft, 0);
+    tourMode = true; try { P('pointerdown', x0, y0, 1, empty); P('pointermove', x0 - 100, y0, 1); eq(sc.scrollLeft, 0, 'na visita, não'); P('pointerup', x0, y0, 0, window); } finally { tourMode = false; }
+    ok(TOUR_STEPS.some(x => /prima e arraste um espaço vazio/.test(x.text)), 'a visita ensina o gesto'); fx(); });
+  await T('U02 ficha da Cena: com o dedo, deslizar para o lado passa à Cena seguinte ou à anterior na Ordem Narrativa', async () => { fx(); state = demoProjectMini(); commit(); renderAll(); closeAllModals(); openSceneFicha('s2'); await W(20);
+    const box = topModal(), back = box.closest('.modal-back'), title = () => box.querySelector('.ficha input').value;
+    const P = (type, x, y, el, o) => el.dispatchEvent(new PointerEvent(type, Object.assign({bubbles:true, cancelable:true, pointerType:'touch', isPrimary:true, pointerId:5, clientX:x, clientY:y}, o || {})));
+    const swipe = async (dx, dy, o) => { const el = box.querySelector((o && o.sel) || '.ficha textarea'); P('pointerdown', 300, 300, el, o); const n = 8; for (let i = 1; i <= n; i++){ P('pointermove', 300 + dx * i / n, 300 + (dy || 0) * i / n, el, o); await W(o && o.slow ? 60 : 8); } P('pointerup', 300 + dx, 300 + (dy || 0), el, o); await W(10); };
+    eq(getComputedStyle(box).touchAction, 'pan-y pinch-zoom', 'o gesto para o lado é da ficha; para cima e para baixo continua a deslocar');
+    await swipe(-200); eq(title(), 'Luz apagada', 'para a esquerda: a Cena seguinte do livro'); ok(back.querySelector('.slide-ghost'), 'com a mesma passagem deslizante'); eq(box.style.transform, '', 'a caixa não fica deslocada'); slideStop(back);
+    await swipe(200); eq(title(), 'A casa da avó', 'para a direita: a anterior'); slideStop(back);
+    await swipe(200); eq(title(), 'Inês desembarca na ilha'); slideStop(back);
+    { const el = box.querySelector('.ficha textarea'); P('pointerdown', 300, 300, el); for (let i = 1; i <= 6; i++) P('pointermove', 300 + i * 40, 300, el); ok(Math.abs(parseFloat(box.style.transform.replace(/[^\d.-]/g, ''))) < 80, 'no início do livro, a caixa resiste: ' + box.style.transform); P('pointerup', 540, 300, el); await W(10); eq(title(), 'Inês desembarca na ilha', 'e volta ao sítio'); eq(box.style.transform, ''); }
+    await swipe(-40, 0, {slow:true}); eq(title(), 'Inês desembarca na ilha', 'um gesto curto e lento não muda de Cena');
+    await swipe(-60, 220); eq(title(), 'Inês desembarca na ilha', 'na vertical é deslocar a ficha, não mudar de Cena');
+    await swipe(-200, 0, {pointerType:'mouse'}); eq(title(), 'Inês desembarca na ilha', 'com o rato, arrastar é selecionar texto');
+    await swipe(-200, 0, {sel:'.scn-fita'}); eq(title(), 'Inês desembarca na ilha', 'a fita tem os seus próprios toques');
+    await swipe(-200); slideStop(back); eq(title(), 'A casa da avó'); await swipe(-200); slideStop(back); eq(title(), 'Luz apagada', 'só pela Ordem Narrativa: numa bifurcação do Arco, segue o livro');
+    { const el = box.querySelector('.ficha textarea'); P('pointerdown', 300, 300, el); for (let i = 1; i <= 6; i++) P('pointermove', 300 - i * 40, 300, el); P('pointerup', 60, 300, el); let clicked = 0; const nb = box.querySelector('.ficha .steps3 button'); nb.addEventListener('click', () => clicked++); nb.click(); eq(clicked, 0, 'o fim do gesto não conta como toque num botão'); slideStop(back); await W(420); nb.click(); eq(clicked, 1, 'logo a seguir, os toques voltam a contar'); }
+    Tour.active = true; try { const t0 = title(); await swipe(-200); eq(title(), t0, 'na visita, não'); } finally { Tour.active = false; }
+    ok(TOUR_STEPS.some(x => /deslize o dedo para o lado/.test(x.text)), 'a visita ensina o gesto'); closeAllModals(); fx(); });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };

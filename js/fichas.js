@@ -158,23 +158,51 @@ document.addEventListener('keydown', e => {
   if (t && (t.isContentEditable || tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && !/^(checkbox|button|submit|reset|file|color)$/.test(t.type)))) return;
   e.preventDefault(); top.sceneNav(e.shiftKey ? 'arc' : 'narr', e.key === 'ArrowLeft' ? 'prev' : 'next', e.repeat);
 });
+/* Deslizar entre Cenas: uma cópia parada da ficha que se deixa (sem as setas) sai para um lado enquanto a nova entra do outro.
+   Animações pela própria página (Web Animations), sem trocar classes — trocar a animação de CSS da caixa recomeçava a de abertura
+   e a ficha piscava. */
+const reduceMotion = () => document.body.classList.contains('reduce-motion') || matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fitaFixed = fita => getComputedStyle(fita).position === 'sticky'; // telemóvel: a fita está presa em baixo e fica parada
+function slideStop(back){ const s = back._slide; if (!s) return; back._slide = null; s.anims.forEach(a => { try { a.cancel(); } catch(e){} }); s.g.remove(); back.classList.remove('sliding'); }
+function slideSnap(back, box){
+  slideStop(back); box.getAnimations().forEach(a => { try { a.finish(); } catch(e){} }); // a ficha acabada de abrir ainda pode estar a crescer
+  const r = box.getBoundingClientRect(), g = box.cloneNode(true), src = box.querySelectorAll('input,textarea,select'), dst = g.querySelectorAll('input,textarea,select');
+  src.forEach((x, i) => { const y = dst[i]; if (!y) return; if (x.type === 'checkbox' || x.type === 'radio') y.checked = x.checked; else y.value = x.value; }); // o que se escreveu não vem na cópia
+  g.querySelectorAll('.ft-sides' + (fitaFixed(box.querySelector('.scn-fita')) ? ', .scn-fita' : '')).forEach(x => x.remove());
+  g.querySelectorAll('[id]').forEach(x => x.removeAttribute('id')); g.removeAttribute('id');
+  g.classList.add('slide-ghost'); g.inert = true; g.setAttribute('aria-hidden', 'true');
+  return {g, r};
+}
+function slidePlay(back, box, snap, dir, from){
+  const br = back.getBoundingClientRect(), {g, r} = snap, s = dir === 'prev' ? 1 : -1, D = r.width + 32;
+  Object.assign(g.style, {left:(r.left - br.left - back.clientLeft + back.scrollLeft) + 'px', top:(r.top - br.top - back.clientTop + back.scrollTop) + 'px', width:r.width + 'px', height:r.height + 'px'});
+  back.classList.add('sliding'); box.before(g); // a nova ficha (e as setas que ficam paradas) por cima da que sai
+  const o = {duration:Math.round(300 * Math.max(.4, 1 - Math.abs(from) / D)), easing:'cubic-bezier(.22,.8,.25,1)'}, still = [...box.querySelectorAll('.ft-side')];
+  const fita = box.querySelector('.scn-fita'); if (fita && fitaFixed(fita)) still.push(fita);
+  const anims = [g.animate([{transform:'none'}, {transform:'translateX(' + (s * D - from) + 'px)'}], o),
+    box.animate([{transform:'translateX(' + (from - s * D) + 'px)'}, {transform:'none'}], o),
+    ...still.map(x => x.animate([{translate:(s * D - from) + 'px 0'}, {translate:'0 0'}], o))];
+  const me = back._slide = {g, anims};
+  anims[1].finished.then(() => { if (back._slide === me) slideStop(back); }, () => {});
+  setTimeout(() => { if (back._slide === me) slideStop(back); }, o.duration + 400); // janela escondida: as animações podem não acabar
+}
 function openSceneFicha(id){
   if (!state.scenes[id]) return;
   const body = h('div', {class:'ficha'});
   const m = openModal({title:_('Cena'), body, wide:true, cls:'scene-modal'});
   const box = m.back.querySelector('.modal'), fita = h('div', {class:'scn-fita', role:'group', 'aria-label':_('Percorrer as Cenas')}), sides = h('div', {class:'ft-sides'});
   m.back.querySelector('.modal-head').after(fita, sides);
-  let to = {}, slideT = 0;
-  /* Passa a outra Cena sem fechar a ficha: troca o conteúdo, volta ao topo, desliza a caixa para o lado de onde se vem
-     e deixa o foco no mesmo botão (ou na seta do mesmo lado, se esse botão já não existir). */
-  const go = (nid, k, dir, quick) => {
+  let to = {};
+  /* Passa a outra Cena sem fechar a ficha: troca o conteúdo e volta ao topo; a Cena anterior sai para um lado e a nova entra
+     do outro, como ao deslizar o dedo; as setas (e, no telemóvel, a fita em baixo) ficam paradas. Deixa o foco no mesmo botão
+     (ou na seta do mesmo lado, se esse botão já não existir). «from»: onde o dedo largou a caixa, num gesto de deslizar. */
+  const go = (nid, k, dir, quick, from) => {
     if (!state.scenes[nid] || nid === id) return false;
+    const snap = !quick && !quietModals && !reduceMotion() ? slideSnap(m.back, box) : (slideStop(m.back), null); // «quick»: tecla premida, sem animação
+    swipeOff();
     id = nid; if (m.entity) m.entity.id = nid;
     draw(); m.back.scrollTop = 0; Dual.report(); dockMark();
-    box.classList.remove('slide-next', 'slide-prev');
-    clearTimeout(slideT);
-    if (!quick && !quietModals){ void box.offsetWidth; box.classList.add(dir === 'prev' ? 'slide-prev' : 'slide-next'); // «quick»: tecla premida, sem animação
-      slideT = setTimeout(() => box.classList.remove('slide-next', 'slide-prev'), 450); } // se a animação não chegar ao fim (janela escondida), a classe sai na mesma
+    if (snap) slidePlay(m.back, box, snap, dir, from || 0);
     const f = box.querySelector('[data-nav="' + k + '"]:not(:disabled)') || box.querySelector('.ft-arrow[data-nav="' + k.replace(/-\d+$/, '') + '"]:not(:disabled)') || box.querySelector('.ft-arrow:not(:disabled)');
     if (f) f.focus({preventScroll:true});
     return true;
@@ -194,7 +222,37 @@ function openSceneFicha(id){
     return true;
   };
   box.addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (b && !b.disabled) act(b.dataset.nav, b); }); // as Cenas da fita e as setas
-  box.addEventListener('animationend', e => { if (e.target === box) box.classList.remove('slide-next', 'slide-prev'); });
+  /* ecrã tátil: deslizar o dedo para o lado passa à Cena seguinte ou à anterior, na Ordem Narrativa; a caixa segue o dedo */
+  const still = () => [...box.querySelectorAll('.ft-side'), ...(fitaFixed(fita) ? [fita] : [])];
+  const swipeOff = () => { box.style.transform = ''; still().forEach(x => x.style.translate = ''); };
+  const canGo = d => { const t = to['narr-' + d]; return !!t && (t.id ? !!state.scenes[t.id] : t.list.length === 1); };
+  let sw = null, swClick = 0;
+  box.addEventListener('pointerdown', e => {
+    sw = null; if (e.pointerType === 'mouse' || !e.isPrimary || tourMode || Tour.active || menuEl || document.querySelector('.ac-list')) return;
+    if (e.target.closest('.scn-fita, select, input[type=range], .ctx-menu')) return;
+    sw = {x:e.clientX, y:e.clientY, id:e.pointerId, on:false, dx:0, pts:[]};
+  });
+  box.addEventListener('pointermove', e => {
+    if (!sw || e.pointerId !== sw.id) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if (!sw.on){ if (Math.abs(dx) < 12) { if (Math.abs(dy) > 12) sw = null; return; }
+      if (Math.abs(dx) < Math.abs(dy) * 1.4){ sw = null; return; }
+      sw.on = true; sw.x = e.clientX; slideStop(m.back); try { box.setPointerCapture(e.pointerId); } catch(x){} }
+    const d = e.clientX - sw.x; sw.dx = canGo(d < 0 ? 'next' : 'prev') ? d : d / 4; // sem Cena desse lado, resiste
+    sw.pts.push([performance.now(), e.clientX]); if (sw.pts.length > 6) sw.pts.shift();
+    box.style.transform = 'translateX(' + sw.dx + 'px)'; still().forEach(x => x.style.translate = (-sw.dx) + 'px 0');
+  });
+  const swipeEnd = cancel => {
+    const s = sw; sw = null; if (!s || !s.on) return; swClick = performance.now();
+    const p = s.pts, v = p.length > 1 ? (p[p.length - 1][1] - p[0][1]) / Math.max(1, p[p.length - 1][0] - p[0][0]) : 0; // px/ms
+    const dir = s.dx < 0 ? 'next' : 'prev', far = Math.abs(s.dx) > Math.min(110, box.offsetWidth * .25), fast = Math.abs(v) > .45 && Math.sign(v) === Math.sign(s.dx) && Math.abs(s.dx) > 30;
+    if (!cancel && (far || fast) && canGo(dir)){ const t = to['narr-' + dir]; if (go(t.id || t.list[0].id, 'narr-' + dir, dir, false, s.dx)) return; }
+    const x = s.dx; swipeOff(); if (reduceMotion() || !x) return; // volta ao sítio
+    const o = {duration:200, easing:'cubic-bezier(.22,.8,.25,1)'};
+    box.animate([{transform:'translateX(' + x + 'px)'}, {transform:'none'}], o); still().forEach(el => el.animate([{translate:(-x) + 'px 0'}, {translate:'0 0'}], o));
+  };
+  box.addEventListener('pointerup', () => swipeEnd(false)); box.addEventListener('pointercancel', () => swipeEnd(true));
+  box.addEventListener('click', e => { if (performance.now() - swClick < 400){ e.stopPropagation(); e.preventDefault(); } }, true); // o fim de um gesto não é um toque
   m.sceneNav = (track, dir, quick) => act(track + '-' + dir, box.querySelector('.ft-arrow[data-nav="' + track + '-' + dir + '"]'), quick);
   const drawFita = () => { const sc = state.scenes[id]; if (!sc) return; const wide = fitaWide(m), ft = sceneFita(sc, wide); to = ft.to; fita.replaceChildren(...ft.rows); sides.replaceChildren(...ft.sides); box.classList.toggle('ft-wide', wide); };
   m.fitaFit = () => { if (box.classList.contains('ft-wide') !== fitaWide(m)) drawFita(); }; // ao mudar o tamanho da janela, as setas mudam de sítio

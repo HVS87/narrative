@@ -306,8 +306,20 @@ function boardPointerDown(e){
   if (sceneEl) startPress(e, ev => beginDrag('scene', sceneEl.dataset.scene, ev));
   else if (chEl) startPress(e, ev => beginDrag('chapter', chEl.dataset.chapter, ev));
   else if (bkEl) startPress(e, ev => beginDrag('book', bkEl.dataset.book, ev));
+  else { const sc = $('#board-scroll'); pan = {x:e.clientX, y:e.clientY, l:sc.scrollLeft, t:sc.scrollTop, on:false}; } // espaço vazio: arrastar desloca o quadro
 }
+/* Rato num espaço vazio do quadro: premir e arrastar desloca-o (como pegar numa folha); sem arrastar, o clique é o de sempre */
+let pan = null;
+function panMove(e){
+  if (!(e.buttons & 1) || drag || linkDrag){ panEnd(); return; }
+  const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+  if (!pan.on){ if (Math.hypot(dx, dy) < 6) return; pan.on = true; suppressClick = true; hideHover(); document.body.classList.add('panning'); }
+  const sc = $('#board-scroll'); sc.scrollLeft = pan.l - dx; sc.scrollTop = pan.t - dy;
+  const sel = window.getSelection && window.getSelection(); if (sel && !sel.isCollapsed) sel.removeAllRanges();
+}
+function panEnd(){ if (pan && pan.on){ document.body.classList.remove('panning'); setTimeout(() => suppressClick = false, 0); } pan = null; }
 window.addEventListener('pointermove', e => {
+  if (pan) panMove(e);
   if (press){ press.last = e; if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) cancelPress(); }
   if (drag){ drag.cx = e.clientX; drag.cy = e.clientY; if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 10) drag.moved = true; dragUpdate(); }
   if (linkDrag && !linkDrag.fake) linkMove(e);
@@ -319,7 +331,7 @@ window.addEventListener('contextmenu', e => { if (suppressCtx || (linkDrag && !l
 /* Esc (ou perder a janela a meio) cancela um arrasto ou uma ligação em curso, sem alterar nada */
 function cancelDrags(keepPick){
   cancelPress(); if (keepPick !== true) endPickLink();
-  if (drag){ drag = null; document.body.classList.remove('dragging'); renderBoard(); }
+  panEnd(); if (drag){ drag = null; document.body.classList.remove('dragging'); renderBoard(); }
   if (linkDrag && !linkDrag.fake){ linkDrag = null; document.body.classList.remove('linking'); holdCtx(4000); renderBoard(); }
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !tourMode) cancelDrags(); });
@@ -332,7 +344,7 @@ for (const ev of ['pointerup', 'pointercancel', 'touchend', 'touchcancel']) wind
 const buzz = () => { try { navigator.vibrate && navigator.vibrate(12); } catch(e){} };
 window.addEventListener('blur', () => { if (!tourMode) cancelDrags(true); });
 window.addEventListener('pointerup', () => {
-  const p = press; cancelPress(); if (suppressClick) setTimeout(() => suppressClick = false, 0);
+  panEnd(); const p = press; cancelPress(); if (suppressClick) setTimeout(() => suppressClick = false, 0);
   if (drag) dragEnd();
   if (linkDrag && !linkDrag.fake) linkEnd();
   // macOS/Linux: o menu de contexto é pedido ao premir; só o mostramos ao largar, se não chegou a ser um clique longo
