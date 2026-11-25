@@ -7,11 +7,17 @@ const DENS = { normal:{SW:140, SH:56, SG:24, LANE:86, LO:10}, compact:{SW:112, S
 const ViewPref = { zoom:Math.min(1.6, Math.max(.3, parseFloat(lsGet(LS_ZOOM)) || 1)), dens:lsGet(LS_DENS) === 'compact' ? 'compact' : 'normal' };
 /* a vista compacta e a ampliação são do PC (barra lateral): no telemóvel e na visita, o quadro tem sempre o tamanho normal */
 const viewFull = () => navMode() === 'rail' && !tourMode && !(typeof Tour !== 'undefined' && Tour.active);
+/* telemóvel (barra de baixo ou, deitado, barra compacta): a ampliação é a dos dois dedos, guardada à parte */
+const LS_MZOOM = 'narrativa.zoomTelemovel';
+const mobileBoard = () => navMode() !== 'rail' && !tourMode && !(typeof Tour !== 'undefined' && Tour.active);
+ViewPref.mzoom = Math.min(1.6, Math.max(.3, parseFloat(lsGet(LS_MZOOM)) || 1));
 function viewBefore(){
-  const full = viewFull(); View.zoom = full ? ViewPref.zoom : 1; View.dens = full ? ViewPref.dens : 'normal';
-  Object.assign(B, DENS[View.dens]); document.body.classList.toggle('dens-compact', View.dens === 'compact');
+  const full = viewFull(); View.zoom = full ? ViewPref.zoom : mobileBoard() ? ViewPref.mzoom : 1; View.dens = full ? ViewPref.dens : 'normal';
+  Object.assign(B, DENS[View.dens]);
+  // telemóvel deitado: «TOMO n» e o nome numa só linha, para o quadro ficar com mais altura
+  B.HEAD_BOOK = navMode() === 'compact' ? 30 : 54; HEAD_H = B.HEAD_BOOK + B.HEAD_CH; document.body.classList.toggle('head-slim', B.HEAD_BOOK < 54); document.body.classList.toggle('dens-compact', View.dens === 'compact');
   const b = $('#board'); if (!b) return;
-  b.style.zoom = View.zoom === 1 ? '' : String(View.zoom);
+  b.style.zoom = View.zoom === 1 ? '' : String(View.zoom); b.style.setProperty('--hb', B.HEAD_BOOK + 'px');
   b.style.setProperty('--sw', B.SW + 'px'); b.style.setProperty('--sh', B.SH + 'px'); b.style.setProperty('--lo', B.LO + 'px');
 }
 function setZoom(z, quiet){
@@ -123,9 +129,47 @@ function zoomUI(){
 window.addEventListener('DOMContentLoaded', () => {
   const sc = $('#board-scroll'); if (!sc) return;
   sc.addEventListener('wheel', e => { if (!(e.ctrlKey || e.metaKey) || !viewFull()) return; e.preventDefault(); setZoom(ViewPref.zoom + (e.deltaY < 0 ? .1 : -.1), true); }, {passive:false});
-  sc.addEventListener('scroll', () => { if (!Mini.raf) Mini.raf = requestAnimationFrame(() => { Mini.raf = 0; miniView(); }); }, {passive:true});
+  sc.addEventListener('scroll', () => { stickHeads(); if (!Mini.raf) Mini.raf = requestAnimationFrame(() => { Mini.raf = 0; miniView(); }); }, {passive:true}); // os cabeçalhos presos vão logo com a deslocação, sem esperar pelo próximo quadro
+  /* telemóvel: dois dedos a afastar ampliam, a aproximar reduzem; o ponto entre os dedos fica onde está */
+  const two = e => { const [a, b] = e.touches; return {d:Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), x:(a.clientX + b.clientX) / 2, y:(a.clientY + b.clientY) / 2}; };
+  sc.addEventListener('touchstart', e => {
+    if (e.touches.length !== 2 || !mobileBoard() || narrView() !== 'board' || activeTab !== 'board') return;
+    const t = two(e); if (t.d < 10) return;
+    Pinch.on = {d:t.d, z:Z()}; Pinch.x = t.x; Pinch.y = t.y; Pinch.z = Z(); cancelDrags(); hideHover(); document.body.classList.add('pinching');
+    if (e.cancelable) e.preventDefault();
+  }, {passive:false});
+  sc.addEventListener('touchmove', e => {
+    if (!Pinch.on || e.touches.length !== 2) return; if (e.cancelable) e.preventDefault();
+    const t = two(e); Pinch.z = Pinch.on.z * t.d / Pinch.on.d; Pinch.x = t.x; Pinch.y = t.y;
+    zoomAt(Pinch.z, Pinch.x, Pinch.y); // o ecrã tátil já envia um movimento por quadro
+  }, {passive:false});
+  const pinchEnd = e => { if (!Pinch.on || e.touches.length >= 2) return; Pinch.on = null; document.body.classList.remove('pinching'); lsSet(LS_MZOOM, String(ViewPref.mzoom));
+    Pinch.until = performance.now() + 350; }; // o dedo que fica ou sai a seguir não conta como toque numa Cena
+  sc.addEventListener('touchend', pinchEnd); sc.addEventListener('touchcancel', pinchEnd);
+  sc.addEventListener('click', e => { if (performance.now() < Pinch.until){ e.stopPropagation(); e.preventDefault(); } }, true);
+  window.addEventListener('resize', () => requestAnimationFrame(stickHeads));
   window.addEventListener('resize', () => { miniMap(); dockResize(); });
 });
+
+const Pinch = { on:null, x:0, y:0, z:1, until:0 };
+/* amplia ou reduz o quadro no telemóvel, mantendo no mesmo sítio do ecrã o ponto (cx, cy) */
+function zoomAt(z, cx, cy){
+  const sc = $('#board-scroll'); if (!sc || !mobileBoard()) return;
+  z = Math.round(Math.min(1.6, Math.max(.3, z)) * 100) / 100; const z0 = Z(); if (z === z0) return;
+  const r = sc.getBoundingClientRect(), px = cx - r.left, py = cy - r.top, X = (sc.scrollLeft + px) / z0, Y = (sc.scrollTop + py) / z0;
+  ViewPref.mzoom = z; viewBefore(); fitBoard(); drawLines();
+  sc.scrollLeft = Math.max(0, X * z - px); sc.scrollTop = Math.max(0, Y * z - py); stickHeads();
+}
+/* telemóvel: o número e o nome do Tomo e do Capítulo acompanham a câmara — ficam encostados à coluna dos Arcos Narrativos
+   enquanto se vê alguma parte desse Tomo ou Capítulo (sem passar do fim dele) */
+function stickHeads(){
+  const sc = $('#board-scroll'), heads = document.querySelectorAll('#headLayer .book-head, #headLayer .ch-head'); if (!sc) return;
+  if (!mobileBoard() || activeTab !== 'board' || narrView() !== 'board'){ heads.forEach(el => { if (el.style.getPropertyValue('--stick')){ el.style.removeProperty('--stick'); el.classList.remove('stuck'); } }); return; }
+  const gut = parseFloat(getComputedStyle($('#gutter')).width) || B.GUT, vis = sc.scrollLeft / Z() + gut;
+  heads.forEach(el => { const x = parseFloat(el.style.left) || 0, w = parseFloat(el.style.width) || 0, book = el.classList.contains('book-head');
+    const s = Math.round(Math.min(Math.max(0, w - (book ? 150 : 96)), Math.max(0, vis - x))); // fica sempre espaço para o número e parte do nome
+    el.style.setProperty('--stick', s + 'px'); el.classList.toggle('stuck', s > 0); });
+}
 
 /* ---------- mini-mapa: a narrativa inteira num canto; mostra a parte à vista e leva a qualquer ponto ---------- */
 const Mini = { raf:0, sx:1, w:0 };

@@ -1366,8 +1366,8 @@ window.__qa = (async () => {
       q('.nl-row').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles:true, cancelable:true, clientX:100, clientY:200})); ok(qa('.ctx-item').some(x => x.textContent === 'Criar nova Cena aqui'), 'menu da Cena'); w.closeMenu();
       q('.view-toggle button[data-view="board"]').click(); await W(30); ok(q('#narrList').hidden && !q('#board-scroll').hidden, 'Quadro'); ok(q('.corner .view-toggle'), 'a escolha está no canto do quadro');
       q('.corner .view-toggle button[data-view="list"]').click(); await W(30); ok(!q('#narrList').hidden);
-      q('#bnav .nav-item[data-tab="elements"]').click(); await W(30); eq(E('activeTab'), 'books'); eq(qa('.el-tabs button').map(b => b.textContent), ['Tomos', 'Arcos Narrativos', 'Personagens', 'Localizações']);
-      qa('.el-tabs button')[2].click(); await W(30); eq(E('activeTab'), 'characters'); eq(q('#bnav [aria-current="page"]').dataset.tab, 'elements');
+      q('#bnav .nav-item[data-tab="elements"]').click(); await W(30); eq(E('activeTab'), 'books'); eq(qa('.el-tabs button').map(b => b.textContent), ['Tomos', 'Capítulos', 'Arcos Narrativos', 'Personagens', 'Localizações']);
+      qa('.el-tabs button')[3].click(); await W(30); eq(E('activeTab'), 'characters'); eq(q('#bnav [aria-current="page"]').dataset.tab, 'elements');
       q('#bnav .nav-item[data-tab="more"]').click(); await W(30); eq(qa('.sheet-row').map(b => b.textContent), ['Materiais de Apoio', 'Definições do Projeto', 'Visita guiada', 'Visita detalhada']);
       qa('.sheet-row')[1].click(); await W(400); ok(q('#setDrawer').classList.contains('open') && E('activeTab') === 'settings', 'Definições na barra lateral'); E('closeDrawer()'); await W(30); eq(E('activeTab'), 'characters');
       q('#moreBtn').click(); await W(20); eq(qa('.ctx-item').map(x => x.textContent), ['Novo Projeto', 'Abrir Projeto…', 'Guardar Projeto', 'Fechar Projeto', 'Anular', 'Refazer']); w.closeMenu(); }); });
@@ -1940,6 +1940,103 @@ window.__qa = (async () => {
       ok(rs[0].right <= rs[1].left + 1 && rs[1].right <= rs[2].left + 1, 'sem se sobreporem'); const tb = d.querySelector('#topbar'); ok(tb.scrollWidth <= tb.clientWidth + 1, 'a barra não transborda');
       bs[0].click(); await W(30); const m = d.querySelector('.pal-menu'); ok(m, 'o menu abre'); const mr = m.getBoundingClientRect(); ok(mr.left >= 0 && mr.right <= 360 && mr.bottom <= 740, 'e cabe no ecrã: ' + JSON.stringify([mr.left, mr.right, mr.bottom]));
       w.closeMenu(); }); });
+  /* ----- telemóvel: dois dedos no quadro, cabeçalho do Tomo condensado ao deitado, Tomo e Capítulo presos à esquerda, claro/escuro do aparelho ----- */
+  const keepLS = async (keys, fn) => { const old = keys.map(k => lsGet(k)); try { await fn(); } finally { keys.forEach((k, i) => old[i] == null ? localStorage.removeItem(k) : lsSet(k, old[i])); } };
+  const bigBook = () => { state = sanitize(demoProject()); commit(); flushSave(); };
+  await T('AB01 telemóvel: dois dedos a aproximar reduzem o quadro e a afastar ampliam; o ponto entre os dedos fica no sítio; fica lembrado; no PC, nada muda', async () => {
+    await keepLS([LS_MZOOM], async () => { localStorage.removeItem(LS_MZOOM); bigBook();
+      await phone(740, 360, async (w, d) => { const E = x => w.eval(x), sc = d.querySelector('#board-scroll');
+        eq(E('navMode()'), 'compact'); eq(E('narrView()'), 'board', 'deitado, o quadro'); eq(E('Z()'), 1); eq(w.getComputedStyle(sc).touchAction, 'pan-x pan-y', 'o navegador não amplia a página por cima do quadro');
+        sc.scrollLeft = 900; await W(30); const r = sc.getBoundingClientRect(), cx = r.left + 320, cy = r.top + 140;
+        const T = (id, x, y) => new w.Touch({identifier:id, target:sc, clientX:x, clientY:y}), ev = (type, ts) => { const e = new w.TouchEvent(type, {touches:ts, targetTouches:ts, changedTouches:ts, bubbles:true, cancelable:true}); sc.dispatchEvent(e); return e.defaultPrevented; };
+        const touch = typeof w.Touch === 'function' && typeof w.TouchEvent === 'function'; // o Firefox de PC pode não ter eventos de toque: aí, a ampliação chama-se diretamente
+        const at = () => (sc.scrollLeft + 320) / E('Z()'), pinch = async (d0, d1) => { if (!touch){ E('zoomAt(Z() * ' + d1 / d0 + ', ' + cx + ', ' + cy + '); lsSet(LS_MZOOM, String(ViewPref.mzoom)); Pinch.until = performance.now() + 350'); await W(20); return; } ok(ev('touchstart', [T(1, cx - d0 / 2, cy), T(2, cx + d0 / 2, cy)]), 'o gesto é do quadro');
+          for (let i = 1; i <= 8; i++){ const dd = d0 + (d1 - d0) * i / 8; ev('touchmove', [T(1, cx - dd / 2, cy), T(2, cx + dd / 2, cy)]); await W(20); } await W(30); ev('touchend', []); await W(20); };
+        const X0 = at(); await pinch(200, 100); ok(Math.abs(E('Z()') - .5) < .02, 'aproximar os dedos para metade: metade do tamanho, ' + E('Z()')); ok(Math.abs(at() - X0) < 6, 'o ponto entre os dedos fica no sítio: ' + [X0, at()]);
+        eq(E('lsGet(LS_MZOOM)'), String(E('ViewPref.mzoom')), 'fica lembrado neste aparelho'); ok(d.querySelector('#board').style.zoom, 'o quadro está reduzido');
+        await pinch(60, 600); eq(E('Z()'), 1.6, 'afastar muito: até 160 %, não mais'); await pinch(400, 10); eq(E('Z()'), .3, 'aproximar muito: até 30 %, não menos');
+        // um toque logo a seguir ao gesto não abre a Cena por baixo do dedo
+        const s = d.querySelector('.scene'); s.click(); await W(20); eq(E('openModals.length'), 0, 'o dedo que sai do gesto não abre fichas');
+        await W(400); E("setTab('settings')"); await W(20); E("setTab('board')"); await W(30); eq(E('Z()'), .3, 'mudar de área e voltar mantém a ampliação');
+        E('startTour()'); await W(60); eq(E('Z()'), 1, 'na visita, o quadro tem sempre o tamanho normal'); E('endTour()'); await W(30); });
+      await phone(740, 360, async (w) => eq(w.eval('Z()'), .3, 'ao reabrir, a ampliação lembrada')); });
+    // no PC, dois dedos (num ecrã tátil) não mudam a ampliação do quadro pelo telemóvel
+    fx(); setTab('board'); await W(20); const z0 = Z(), sc = $('#board-scroll'), r = sc.getBoundingClientRect(); if (typeof Touch === 'function' && typeof TouchEvent === 'function'){
+    const T = (id, x) => new Touch({identifier:id, target:sc, clientX:x, clientY:r.top + 100}); sc.dispatchEvent(new TouchEvent('touchstart', {touches:[T(1, r.left + 200), T(2, r.left + 400)], bubbles:true, cancelable:true}));
+    sc.dispatchEvent(new TouchEvent('touchmove', {touches:[T(1, r.left + 280), T(2, r.left + 320)], bubbles:true, cancelable:true})); await W(40); sc.dispatchEvent(new TouchEvent('touchend', {touches:[], bubbles:true})); }
+    eq(Z(), z0, 'no PC, a ampliação é a dos botões − e +'); eq(getComputedStyle(sc).touchAction === 'pan-x pan-y', false); fx(); });
+  await T('AB02 telemóvel deitado: «TOMO n» e o nome do Tomo numa só linha, e o quadro ganha altura; ao alto e no PC, como antes', async () => { bigBook();
+    const look = d => { const hd = d.querySelector('.book-head'), k = hd.querySelector('.book-kicker').getBoundingClientRect(), n = hd.querySelector('.book-name').getBoundingClientRect(), ch = d.querySelector('.ch-head').getBoundingClientRect();
+      return {h:hd.getBoundingClientRect().height, line:Math.abs((k.top + k.bottom) / 2 - (n.top + n.bottom) / 2) < 4 && n.left > k.right, layer:d.querySelector('#headLayer').getBoundingClientRect().height, chTop:Math.round(ch.top - hd.getBoundingClientRect().top), cut:n.width < 40}; };
+    await phone(740, 360, async (w, d) => { const o = look(d); eq([o.h, o.line, o.layer, o.chTop], [30, true, 64, 30], 'deitado, numa linha: ' + JSON.stringify(o)); ok(!o.cut, 'o nome tem espaço');
+      const a = d.querySelector('.book-actions').getBoundingClientRect(), hd = d.querySelector('.book-head').getBoundingClientRect(); ok(a.top >= hd.top - 1 && a.bottom <= hd.bottom + 1, 'os botões ⓘ e + cabem na linha');
+      eq(w.eval('HEAD_H'), 64); const s = d.querySelector('.scene').getBoundingClientRect(); ok(s.top - d.querySelector('#board-scroll').getBoundingClientRect().top < 64 + 40, 'as Cenas começam logo abaixo');
+      const tight = w.eval("state.books.every(b => { const e = document.querySelector('.book-head[data-book=\"' + b.id + '\"] .book-name'); return e.scrollWidth <= e.clientWidth + 1; })"); ok(tight, 'nenhum nome de Tomo fica cortado'); });
+    await phone(390, 800, async (w, d) => { w.eval("Narr.view = 'board'; renderAll()"); await W(60); const o = look(d); eq([o.h, o.line, o.layer], [54, false, 88], 'ao alto, em duas linhas: ' + JSON.stringify(o)); });
+    setTab('board'); await W(20); const o = look(document); eq([o.h, o.line, o.layer], [54, false, 88], 'no PC, como antes'); ok(!document.body.classList.contains('head-slim')); fx(); });
+  await T('AB03 telemóvel: o número e o nome do Tomo e do Capítulo acompanham a câmara, encostados à coluna dos Arcos, sem passar do fim deles', async () => { bigBook();
+    const chk = async (w, d, what) => { const go = async v => { sc.scrollLeft = v; sc.dispatchEvent(new w.Event('scroll')); await W(60); }; /* a janela de teste pode não desenhar: o evento de deslocação é enviado à mão */ const sc = d.querySelector('#board-scroll'), gut = () => d.querySelector('#gutter').getBoundingClientRect().right;
+      const heads = [...d.querySelectorAll('#headLayer .ch-head')], big = heads.reduce((a, b) => parseFloat(b.style.width) > parseFloat(a.style.width) ? b : a), x = parseFloat(big.style.left), wd = parseFloat(big.style.width), z = w.eval('Z()');
+      await go((x + wd / 2) * z - (gut() - sc.getBoundingClientRect().left));
+      const num = big.querySelector('.ch-num').getBoundingClientRect(); ok(Math.abs(num.left - gut()) < 24 * z + 4, what + ': o número do Capítulo fica encostado à coluna dos Arcos: ' + [num.left, gut()]); ok(big.classList.contains('stuck'), what + ': assinalado');
+      const bk = [...d.querySelectorAll('#headLayer .book-head')].find(b => { const l = parseFloat(b.style.left); return l <= x && l + parseFloat(b.style.width) >= x + wd; }), kk = bk.querySelector('.book-kicker').getBoundingClientRect();
+      ok(kk.left >= gut() - 2 && kk.left < gut() + 40 * z, what + ': e «TOMO n» também: ' + [kk.left, gut()]); ok(bk.querySelector('.book-name').getBoundingClientRect().width > 30 * z, what + ': com o nome à vista');
+      await go((x + wd - 20) * z - (gut() - sc.getBoundingClientRect().left)); const n2 = big.querySelector('.ch-num').getBoundingClientRect(), hr = big.getBoundingClientRect();
+      ok(n2.right < hr.right - 20 * z, what + ': no fim do Capítulo, o número não sai dele: ' + [n2.right, hr.right]);
+      await go(0); eq(d.querySelectorAll('#headLayer .stuck').length, 0, what + ': no início, tudo no lugar de sempre'); };
+    await phone(740, 360, async (w, d) => { await chk(w, d, 'deitado');
+      const sc = d.querySelector('#board-scroll'), r = sc.getBoundingClientRect(), T = (id, x) => new w.Touch({identifier:id, target:sc, clientX:x, clientY:r.top + 140}), ev = (t, ts) => sc.dispatchEvent(new w.TouchEvent(t, {touches:ts, changedTouches:ts, bubbles:true, cancelable:true}));
+      if (typeof w.TouchEvent === 'function' && typeof w.Touch === 'function'){ ev('touchstart', [T(1, r.left + 250), T(2, r.left + 450)]); for (let i = 1; i <= 6; i++){ ev('touchmove', [T(1, r.left + 250 + i * 12), T(2, r.left + 450 - i * 12)]); await W(20); } ev('touchend', []); }
+      else w.eval('zoomAt(.64, ' + (r.left + 350) + ', ' + (r.top + 140) + ')'); await W(30); ok(w.eval('Z()') < .8, 'reduzido: ' + w.eval('Z()'));
+      await chk(w, d, 'reduzido com dois dedos');
+      w.eval("lsSet(LS_MZOOM, '1')"); });
+    await phone(390, 800, async (w, d) => { w.eval("Narr.view = 'board'; renderAll()"); await W(60); await chk(w, d, 'ao alto'); });
+    setTab('board'); await W(20); $('#board-scroll').scrollLeft = 1500; await W(60); eq(document.querySelectorAll('#headLayer .stuck').length, 0, 'no PC, os cabeçalhos ficam onde estão'); $('#board-scroll').scrollLeft = 0; fx(); });
+  await T('AB04 telemóvel: claro ou escuro segue sempre o aparelho, mesmo que no PC se tenha escolhido outro; paletas sem repetidas e sem prender o modo', async () => {
+    await keepLS([LS_THEME, LS_PAL], async () => { lsSet(LS_THEME, matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'); fx(); flushSave();
+      await phone(390, 800, async (w, d) => { const E = x => w.eval(x), os = w.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        eq(E('themePref()'), 'auto'); eq(d.documentElement.dataset.mode, os, 'segue o aparelho, não o que ficou escolhido no PC');
+        E("setTab('settings')"); await W(40); ok(d.querySelector('.theme-auto') && !d.querySelector('.theme-seg'), 'nas Definições, diz que segue o aparelho, sem o seletor');
+        const pals = [...d.querySelectorAll('.pal')].map(p => p.textContent); ok(pals.length >= 7, 'paletas: ' + pals); eq(new Set(E("palChoices(PRESET_PALETTES).map(p => p.h)")).size, E("palChoices(PRESET_PALETTES).length"), 'sem duas da mesma cor');
+        eq(E("palChoices(PRESET_PALETTES).every(p => p.mode === effectiveMode())"), true, 'todas no modo do aparelho'); ok(pals.some(p => p.includes(os === 'dark' ? 'Meia-noite' : 'Papel')), 'a de 220° com o nome do modo certo');
+        const before = E('lsGet(LS_THEME)'); [...d.querySelectorAll('.pal')].find(p => p.textContent.includes('Floresta')).click(); await W(20);
+        eq([E('state.project.palette.h'), E('lsGet(LS_THEME)'), d.documentElement.dataset.mode], [150, before, os], 'escolher uma paleta muda a cor e não prende o claro ou o escuro');
+        ok(d.querySelector('.pal.on') && d.querySelector('.pal.on').textContent.includes('Floresta'), 'fica assinalada');
+        const mq = E("matchMedia('(prefers-color-scheme: dark)')"); ok(mq, 'o aparelho avisa quando muda de modo'); E("setTab('board')"); });
+      eq(themePref(), lsGet(LS_THEME), 'no PC, o modo escolhido continua a valer'); });
+    state.project.palette = {h:220, mode:'dark'}; applyPalette(); fx(); });
+  await T('AC01 telemóvel: em «Elementos», Tomos e Capítulos em separadores próprios, com os mesmos filtros; no PC, juntos como antes', async () => { bigBook();
+    const nCh = state.books.reduce((n, b) => n + b.chapters.length, 0), nB = state.books.length, arc = state.arcs[state.arcs.length - 1];
+    await phone(390, 800, async (w, d) => { const E = x => w.eval(x), q = s => d.querySelector(s), qa = s => [...d.querySelectorAll(s)];
+      E("ListUI.layout = 'cards'");
+      q('#bnav .nav-item[data-tab="elements"]').click(); await W(30); eq(E('activeTab'), 'books');
+      eq(qa('.el-tabs button').map(b => b.textContent), ['Tomos', 'Capítulos', 'Arcos Narrativos', 'Personagens', 'Localizações'], 'cinco separadores');
+      qa('.el-tabs button').forEach(b => ok(E('tipFor')(b), 'explicador: ' + b.textContent)); ok(/separador ao lado/.test(E('tipFor')(qa('.el-tabs button')[0]).text), 'o explicador dos Tomos diz onde estão os Capítulos');
+      eq(q('#view-page h1').textContent, 'Tomos'); eq(qa('#view-page .list-box').length, 1, 'só a lista dos Tomos'); ok(!q('#view-page .list-sub'), 'sem os Capítulos por baixo');
+      eq(qa('#view-page .list-box .card').length, nB, 'todos os Tomos'); ok(!q('#view-page .ch-card'));
+      qa('.el-tabs button')[1].click(); await W(30); eq(E('activeTab'), 'chapters'); eq(q('#bnav [aria-current="page"]').dataset.tab, 'elements', 'continua em Elementos');
+      ok(q('.el-tabs button.on').textContent === 'Capítulos' && q('.el-tabs button.on').getAttribute('aria-selected') === 'true', 'o separador assinalado');
+      eq(q('#view-page h1').textContent, 'Capítulos'); eq(qa('#view-page .ch-card').length, nCh, 'todos os Capítulos, de todos os Tomos');
+      eq(qa('#view-page .ch-card .kicker').slice(0, 2).map(k => k.textContent), ['Tomo 1 · Capítulo 1', 'Tomo 1 · Capítulo 2'], 'pela ordem do livro');
+      ok(qa('#view-page .page-head .btn').some(b => b.textContent === '+ Novo Capítulo'), 'com «+ Novo Capítulo»'); ok(qa('#view-page .page-head input').length >= 3, 'filtros por Personagem e Arco Narrativo, e procura');
+      // filtro do Arco Narrativo: vale para os dois separadores
+      E("filters.booksArc = '" + arc.id + "'; renderAll()"); await W(30); const nf = qa('#view-page .ch-card').length; ok(nf > 0 && nf < nCh, 'o filtro do Arco reduz os Capítulos: ' + nf);
+      qa('.el-tabs button')[0].click(); await W(30); ok(qa('#view-page .list-box .card').length <= nB, 'e os Tomos'); E('filters.booksArc = null; renderAll()'); qa('.el-tabs button')[1].click(); await W(30);
+      // procura própria
+      const inp = q('#view-page .page-head input[type="search"], #view-page .page-head .list-q'); ok(inp, 'caixa de procura');
+      if (inp){ const name = E('state.books[0].chapters[1].name'); inp.value = name; inp.dispatchEvent(new w.Event('input', {bubbles:true})); await W(30); ok(qa('#view-page .ch-card').length >= 1 && qa('#view-page .ch-card h3').every(h => h.textContent.toLowerCase().includes(name.toLowerCase().slice(0, 4))), 'procura pelo nome');
+        qa('.el-tabs button')[0].click(); await W(30); eq(qa('#view-page .list-box .card').length, nB, 'a procura dos Capítulos não esconde Tomos'); qa('.el-tabs button')[1].click(); await W(30); inp.value = ''; E("ListUI.q.chapters = ''; renderAll()"); await W(20); }
+      // tocar num Capítulo leva ao quadro
+      const c2 = qa('#view-page .ch-card')[1]; c2.click(); await W(60); eq(E('activeTab'), 'board', 'tocar num Capítulo vai ao quadro');
+      q('#bnav .nav-item[data-tab="elements"]').click(); await W(30); eq(E('activeTab'), 'chapters', 'Elementos volta ao último separador');
+      qa('.el-tabs button')[4].click(); await W(80); { const et = q('.el-tabs'), b = q('.el-tabs button.on').getBoundingClientRect(), r = et.getBoundingClientRect(); ok(b.left >= r.left - 1 && b.right <= r.right + 1, 'o separador escolhido fica à vista, mesmo o último: ' + [b.left, b.right, r.left, r.right, et.scrollLeft, et.scrollWidth, et.clientWidth, q('.el-tabs button.on').textContent]); }
+      qa('.el-tabs button')[1].click(); await W(30);
+      ok(E("TOUR_STEPS.some(s => s.sel === '.el-tabs' && s.when())"), 'a visita mostra os separadores no telemóvel');
+      // alargar a janela (ou rodar para um ecrã largo): no PC, os Capítulos voltam a estar por baixo dos Tomos
+      w.frameElement.style.width = '1280px'; w.frameElement.style.height = '800px'; await W(300); if (E('activeTab') === 'chapters') E('renderAll()'); /* a janela de teste pode não desenhar, e o aviso da mudança de tamanho só chega com o desenho */
+      eq(E('navMode()'), 'rail'); eq(E('activeTab'), 'books', 'no PC não há separador dos Capítulos'); ok(q('#view-page .list-sub') && qa('#view-page .ch-card').length === nCh, 'os Capítulos por baixo dos Tomos'); });
+    setTab('chapters'); await W(20); eq(activeTab, 'books', 'no PC, pedir os Capítulos mostra a página dos Tomos'); eq($('#view-page h1').textContent, 'Tomos e Capítulos'); ok($('#view-page .list-sub'));
+    ok(!TOUR_STEPS.find(s => s.sel === '.el-tabs').when(), 'no PC, a visita mostra a página como antes'); setTab('board'); fx(); });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };

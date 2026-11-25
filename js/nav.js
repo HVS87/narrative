@@ -66,7 +66,7 @@ const svgIcon = (k, cls) => h('span', {class:'nic' + (cls ? ' ' + cls : ''), 'ar
 const NAV_FULL = [['board', _('Narrativa'), 'board'], ['plan', _('Plano'), 'plan'], '-', ['books', _('Tomos e Capítulos'), 'book', _('Tomos')], ['arcs', _('Arcos Narrativos'), 'arc', _('Arcos')], ['characters', _('Personagens'), 'people'],
   ['sceneries', _('Localizações'), 'pin'], '-', ['refs', _('Referências'), 'mark'], ['support', _('Apoio'), 'bulb']];
 const NAV_COMPACT = [['board', _('Narrativa'), 'board'], ['plan', _('Plano'), 'plan'], ['elements', _('Elementos'), 'layers'], ['refs', _('Referências'), 'mark'], ['more', _('Mais'), 'more']];
-const ELEMENT_TABS = ['books', 'arcs', 'characters', 'sceneries'];
+const ELEMENT_TABS = ['books', 'chapters', 'arcs', 'characters', 'sceneries']; // «chapters» só existe no telemóvel (no PC, os Capítulos estão por baixo dos Tomos)
 /* telemóvel ao alto (ou janela estreita e alta): barra em baixo; telemóvel deitado: barra lateral com os cinco destinos */
 const BNAV_Q = matchMedia('(max-width:699px) and (orientation:portrait)');
 const navMode = () => BNAV_Q.matches ? 'bottom' : MOBILE_Q.matches ? 'compact' : 'rail';
@@ -95,10 +95,10 @@ function navGo(k, btn){
   if (k === 'more') return moreSheet();
   setTab(k);
 }
-/* Elementos (telemóvel): Books, Story Arcs, Characters e Sceneries num seletor no topo da página */
+/* Elementos (telemóvel): Tomos, Capítulos, Arcos Narrativos, Personagens e Localizações num seletor no topo da página */
 function elementTabs(tab){
   return h('div', {class:'el-tabs', role:'tablist', 'aria-label':_('Elementos')}, ELEMENT_TABS.map(k => h('button', {class:k === tab ? 'on' : '', role:'tab', 'aria-selected':String(k === tab), dataset:{tab:k},
-    onclick:() => setTab(k)}, k === 'books' ? _('Tomos') : TABS.find(t => t[0] === k)[1]))); // «Tomos e Capítulos» não cabe: o nome completo está no título da página
+    onclick:() => setTab(k)}, k === 'books' ? _('Tomos') : k === 'chapters' ? _('Capítulos') : TABS.find(t => t[0] === k)[1]))); // «Tomos e Capítulos» não cabe: o nome completo está no título da página
 }
 
 /* ---------- folhas (telemóvel): uma janela que sobe do fundo do ecrã ---------- */

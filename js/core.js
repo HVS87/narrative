@@ -535,10 +535,22 @@ function paletteVars(p){
 }
 /* Claro ou escuro é deste dispositivo (não do projeto): «auto» segue o sistema operativo; «light» e «dark» ficam lembrados. */
 const LS_THEME = 'narrativa.theme';
-const themePref = () => { const v = lsGet(LS_THEME); return v === 'light' || v === 'dark' ? v : 'auto'; };
+/* no telemóvel, claro ou escuro segue sempre o aparelho (o que se escolheu no PC não conta lá) */
+const followsDevice = () => typeof navMode === 'function' && navMode() !== 'rail';
+const themePref = () => { if (followsDevice()) return 'auto'; const v = lsGet(LS_THEME); return v === 'light' || v === 'dark' ? v : 'auto'; };
 const OS_DARK = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
 const effectiveMode = () => themePref() === 'auto' ? (OS_DARK && !OS_DARK.matches ? 'light' : 'dark') : themePref();
 function setTheme(v){ lsSet(LS_THEME, v); applyPalette(); renderAll(); }
+/* as paletas para escolher: no telemóvel, cada uma no modo do aparelho, e as de cor igual (Meia-noite e Papel) ficam uma só */
+function palChoices(list){
+  if (!followsDevice()) return list;
+  const m = effectiveMode(), out = [];
+  for (const p of list){ const i = out.findIndex(o => o.h === p.h), q = {name:p.name, h:p.h, mode:m}; if (i < 0) out.push(q); else if (p.mode === m) out[i] = q; }
+  return out;
+}
+const palOn = (pal, p) => pal.h === p.h && (followsDevice() || pal.mode === effectiveMode());
+/* aplica uma paleta ao projeto à vista; no PC, o modo dela (claro ou escuro) fica lembrado neste dispositivo */
+function choosePal(pal){ state.project.palette = {h:pal.h, mode:pal.mode}; lsSet(LS_PAL, String(pal.h)); if (!followsDevice()) lsSet(LS_THEME, pal.mode); applyPalette(); }
 if (OS_DARK) try { OS_DARK.addEventListener('change', () => { if (themePref() === 'auto' && state){ applyPalette(); renderAll(); } }); } catch(e){}
 window.addEventListener('storage', e => { if (e.key === LS_THEME && state){ applyPalette(); renderAll(); } }); // outra janela mudou o tema
 function applyPalette(){

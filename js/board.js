@@ -25,11 +25,11 @@ function textWidth(t, px){
 /* largura de que o cabeçalho de um Chapter precisa: margens, número, intervalo, nome */
 const chNeed = (name, n) => Math.ceil(10 + Math.max(20, String(n).length * 7 + 10) + 8 + Math.min(textWidth(name || _('Sem título'), 13), B.CH_NAME_MAX) + 10 + 6);
 /* e o de um Book: margens do cabeçalho, nome e o espaço dos botões ⓘ e + à direita */
-const bookNeed = name => Math.ceil(14 + Math.min(textWidth(name || _('Sem nome'), 18), B.BOOK_NAME_MAX) + (coarse() ? 84 : 60) + 10 + 6);
+const bookNeed = name => Math.ceil(14 + Math.min(textWidth(name || _('Sem nome'), 18), B.BOOK_NAME_MAX) + (coarse() ? 84 : 60) + 10 + 6 + (B.HEAD_BOOK < 54 ? 72 : 0)); // condensado: «TOMO n» na mesma linha
 /* o Chapter da mensagem inicial: largo o bastante para ela caber em poucas linhas, mas nunca mais largo do que o ecrã */
 const hintChW = () => { const sc = $('#board-scroll'); return Math.max(B.SW + 2 * B.CP, Math.min(B.HINT_CH, (sc ? sc.clientWidth : innerWidth) / Z() - B.GUT - 2 * B.BP - 8)); };
 let hintW = 0; // largura com que a mensagem inicial foi desenhada
-const HEAD_H = B.HEAD_BOOK + B.HEAD_CH;
+let HEAD_H = B.HEAD_BOOK + B.HEAD_CH; // no telemóvel deitado, o cabeçalho do Tomo é mais baixo (viewBefore)
 const PROPS = ['x', 'y', 'w'];
 
 let L = null;            // layout alvo atual
@@ -199,7 +199,7 @@ function tick(){
     else for (const p of PROPS){ const d = t[p] - c[p]; if (Math.abs(d) > 0.4){ c[p] += d * 0.2; moving = true; } else c[p] = t[p]; }
     applyPos(k, c);
   }
-  drawLines();
+  drawLines(); if (typeof stickHeads === 'function') stickHeads(); // os cabeçalhos presos acompanham os Tomos e Capítulos que mudam de sítio
   if (moving || drag || linkDrag) requestAnimationFrame(tick); else rafOn = false;
 }
 
@@ -286,6 +286,7 @@ function startPress(e, fn){
   press = { x:e.clientX, y:e.clientY, last:e, right:e.button === 2, ctx:null, t:setTimeout(() => { const p = press; press = null; fn(p.last); }, 380) };
 }
 function boardPointerDown(e){
+  if (e.pointerType === 'touch' && !e.isPrimary){ cancelDrags(); return; } // um segundo dedo: é para ampliar ou reduzir, não para arrastar
   lastPtr = isTouchPtr(e) ? 'touch' : 'mouse';
   const hd = e.target.closest('.conv-h');
   if (hd){ if (!tourMode && !isTouchPtr(e) && e.button === 0){ e.preventDefault(); beginLink(hd.closest('.scene').dataset.scene, e); if (linkDrag) Object.assign(linkDrag, {handle:true, x0:e.clientX, y0:e.clientY}); } return; }

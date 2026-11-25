@@ -1515,5 +1515,12 @@ I18N.en = {
   "Eliminar a Nota «{nome}»?": "Delete the Note “{nome}”?",
   "Eliminar a Referência «{nome}»?": "Delete the Reference “{nome}”?",
   "Eliminar Nota": "Delete Note",
-  "Eliminar o objetivo «{nome}»? As Referências associadas mantêm-se.": "Delete the goal “{nome}”? Linked References are kept."
+  "Eliminar o objetivo «{nome}»? As Referências associadas mantêm-se.": "Delete the goal “{nome}”? Linked References are kept.",
+  "Quadro no telemóvel": "The board on a phone",
+  "Afaste dois dedos sobre o quadro para o ampliar e aproxime-os para ver a narrativa de mais longe. Ao deslocar o quadro para o lado, o número e o nome do Tomo e do Capítulo em que está vão consigo, encostados à esquerda. As cores claras ou escuras seguem as do aparelho.": "Spread two fingers on the board to zoom in, and pinch them together to see the story from further away. As you move the board sideways, the number and name of the Book and Chapter you are in travel with you, against the left edge. Light or dark colors follow the device’s.",
+  "No telemóvel, claro ou escuro segue sempre o aparelho: muda sozinho quando o aparelho muda.": "On a phone, light or dark always follows the device: it changes by itself when the device does.",
+  "A paleta dá o tom das cores ao projeto.": "The palette sets the tone of the project’s colors.",
+  "Lista de todos os Tomos, com filtros por Personagem e por Arco Narrativo. Os Capítulos estão no separador ao lado.": "List of all Books, with filters by Character and by Story Arc. Chapters are in the next tab.",
+  "Lista de todos os Capítulos, pela ordem do livro, com os mesmos filtros dos Tomos. Toque num Capítulo para ir até ele no quadro.": "List of all Chapters, in book order, with the same filters as Books. Tap a Chapter to go to it on the board.",
+  "No telemóvel, «Elementos» junta os Tomos, os Capítulos, os Arcos Narrativos, as Personagens e as Localizações, cada um no seu separador, no topo da página. Tomos e Capítulos têm os mesmos filtros, por Personagem e por Arco Narrativo; todas as listas têm procura, ordenação e a escolha entre cartões e linhas. Toque num Tomo para abrir a ficha, ou num Capítulo para ir até ele no quadro.": "On a phone, “Elements” gathers Books, Chapters, Story Arcs, Characters and Locations, each in its own tab at the top of the page. Books and Chapters share the same filters, by Character and by Story Arc; every list has search, sorting and a choice between cards and rows. Tap a Book to open its details, or a Chapter to go to it on the board."
 };

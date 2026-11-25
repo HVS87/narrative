@@ -4,6 +4,10 @@
 const LS_TIPS = 'narrativa.tips';
 const Tips = { on:lsGet(LS_TIPS) !== '0', el:null, cur:null, timer:null, x:0, y:0, DELAY:550, touchT:0 };
 
+/* no telemóvel, «Elementos» tem Tomos e Capítulos em separadores próprios */
+const EL_TIPS = {
+  books:[_('Tomos'), _('Lista de todos os Tomos, com filtros por Personagem e por Arco Narrativo. Os Capítulos estão no separador ao lado.')],
+  chapters:[_('Capítulos'), _('Lista de todos os Capítulos, pela ordem do livro, com os mesmos filtros dos Tomos. Toque num Capítulo para ir até ele no quadro.')] };
 const TAB_TIPS = {
   board:[_('Narrativa'), _('O quadro principal: Tomos em colunas, Capítulos e Cenas dispostos pela Ordem Narrativa, com uma faixa por Arco Narrativo.')],
   books:[_('Tomos e Capítulos'), _('Lista de todos os Tomos e, por baixo, dos seus Capítulos, com filtros por Personagem e por Arco Narrativo.')],
@@ -225,7 +229,7 @@ const TIP_RULES = [
   ['#setBtn', _('Definições do Projeto'), el => el.classList.contains('on') ? _('Está nas Definições. Clique outra vez para voltar à área em que estava.') : _('Nome do projeto, sincronização, tema e paleta de cores, instalar como app, atualizações, explicadores e visitas.')],
   ['#moreBtn', _('Mais opções'), _('Novo, Abrir, Guardar e Fechar Projeto; Anular e Refazer.')],
   ['.nav-item', el => (TAB_TIPS[el.dataset.tab] || [])[0], el => (TAB_TIPS[el.dataset.tab] || [])[1]],
-  ['.el-tabs button', el => (TAB_TIPS[el.dataset.tab] || [])[0], el => (TAB_TIPS[el.dataset.tab] || [])[1]],
+  ['.el-tabs button', el => (EL_TIPS[el.dataset.tab] || TAB_TIPS[el.dataset.tab] || [])[0], el => (EL_TIPS[el.dataset.tab] || TAB_TIPS[el.dataset.tab] || [])[1]],
   ['#createBtn, #createFab', _('Criar'), _('Cria uma Cena, um Capítulo, um Tomo, um Arco Narrativo, uma Personagem, uma Localização, uma Nota, uma Referência ou um objetivo de pesquisa, a partir de qualquer área.')],
   ['.create-menu .ctx-item, .create-grid button', el => (CREATE_TIPS[(el.querySelector('[data-k]') || el).dataset.k] || [])[0], el => (CREATE_TIPS[(el.querySelector('[data-k]') || el).dataset.k] || [])[1]],
   ['.more-menu .ctx-item', el => MORE_TIPS[el.textContent] ? el.textContent : null, el => MORE_TIPS[el.textContent]],

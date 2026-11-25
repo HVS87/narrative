@@ -1515,5 +1515,12 @@ I18N.fr = {
   "Eliminar a Nota «{nome}»?": "Supprimer la Note « {nome} » ?",
   "Eliminar a Referência «{nome}»?": "Supprimer la Référence « {nome} » ?",
   "Eliminar Nota": "Supprimer la Note",
-  "Eliminar o objetivo «{nome}»? As Referências associadas mantêm-se.": "Supprimer l’objectif « {nome} » ? Les Références associées sont conservées."
+  "Eliminar o objetivo «{nome}»? As Referências associadas mantêm-se.": "Supprimer l’objectif « {nome} » ? Les Références associées sont conservées.",
+  "Quadro no telemóvel": "Le tableau sur le téléphone",
+  "Afaste dois dedos sobre o quadro para o ampliar e aproxime-os para ver a narrativa de mais longe. Ao deslocar o quadro para o lado, o número e o nome do Tomo e do Capítulo em que está vão consigo, encostados à esquerda. As cores claras ou escuras seguem as do aparelho.": "Écartez deux doigts sur le tableau pour l’agrandir, et rapprochez-les pour voir le récit de plus loin. Quand vous déplacez le tableau sur le côté, le numéro et le nom du Tome et du Chapitre où vous êtes vous suivent, collés à gauche. Les couleurs claires ou sombres suivent celles de l’appareil.",
+  "No telemóvel, claro ou escuro segue sempre o aparelho: muda sozinho quando o aparelho muda.": "Sur le téléphone, clair ou sombre suit toujours l’appareil : il change tout seul quand l’appareil change.",
+  "A paleta dá o tom das cores ao projeto.": "La palette donne le ton des couleurs du projet.",
+  "Lista de todos os Tomos, com filtros por Personagem e por Arco Narrativo. Os Capítulos estão no separador ao lado.": "Liste de tous les Tomes, avec des filtres par Personnage et par Arc Narratif. Les Chapitres sont dans l’onglet voisin.",
+  "Lista de todos os Capítulos, pela ordem do livro, com os mesmos filtros dos Tomos. Toque num Capítulo para ir até ele no quadro.": "Liste de tous les Chapitres, dans l’ordre du livre, avec les mêmes filtres que les Tomes. Touchez un Chapitre pour y aller sur le tableau.",
+  "No telemóvel, «Elementos» junta os Tomos, os Capítulos, os Arcos Narrativos, as Personagens e as Localizações, cada um no seu separador, no topo da página. Tomos e Capítulos têm os mesmos filtros, por Personagem e por Arco Narrativo; todas as listas têm procura, ordenação e a escolha entre cartões e linhas. Toque num Tomo para abrir a ficha, ou num Capítulo para ir até ele no quadro.": "Sur le téléphone, « Éléments » réunit les Tomes, les Chapitres, les Arcs Narratifs, les Personnages et les Lieux, chacun dans son onglet, en haut de la page. Tomes et Chapitres ont les mêmes filtres, par Personnage et par Arc Narratif ; toutes les listes ont une recherche, un tri et le choix entre cartes et lignes. Touchez un Tome pour ouvrir sa fiche, ou un Chapitre pour y aller sur le tableau."
 };

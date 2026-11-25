@@ -15,11 +15,13 @@ const MOBILE_Q = matchMedia('(max-width:699px), (max-height:520px) and (orientat
 const Drawer = { under:'board' };
 const drawerMode = () => MOBILE_Q.matches && activeTab === 'settings';
 function setTab(t){
+  if (t === 'chapters' && navMode() === 'rail') t = 'books'; // no PC, os Capítulos estão na página dos Tomos
   if (t === 'settings' && activeTab !== 'settings') Drawer.under = activeTab;
   activeTab = t; ssSet(SS_TAB, t); if (typeof hideTip === 'function') hideTip(); // o explicador era de um elemento que vai desaparecer
   if (activeTab !== 'board') endPickLink(); renderAll(); }
 const closeDrawer = () => { if (activeTab === 'settings') setTab(Drawer.under && Drawer.under !== 'settings' ? Drawer.under : 'board'); };
 function renderAll(){
+  if (activeTab === 'chapters' && navMode() === 'rail') activeTab = 'books'; // rodar o telemóvel ou alargar a janela
   document.title = state.project.name + ' — Narrative';
   $('#projName').textContent = state.project.name;
   if (typeof projUI === 'function'){ projUI(); fabUI(); }
@@ -53,7 +55,7 @@ function drawerUI(open){
 }
 // na fase de captura, antes de uma janela aberta por cima tratar o Esc (que só fecha essa janela)
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && drawerMode() && !openModals.length && !document.querySelector('.ctx-menu, .ac-list') && !(typeof Tour !== 'undefined' && Tour.active)) closeDrawer(); }, true);
-MOBILE_Q.addEventListener('change', () => { if (state) renderAll(); }); // rodar o telemóvel ou estreitar a janela: as Definições passam de página a barra lateral, e vice-versa
+MOBILE_Q.addEventListener('change', () => { if (state){ applyPalette(); renderAll(); } }); // rodar o telemóvel ou estreitar a janela: as Definições passam de página a barra lateral, e vice-versa
 function filterBox(label, getItems, val, setVal){
   if (val){ const it = getItems().find(i => i.id === val);
     return h('span', {class:'chip'}, label + ': ' + (it ? it.label : '?'), h('button', {class:'chip-x', onclick:() => { setVal(null); renderAll(); }}, '✕')); }
@@ -72,8 +74,12 @@ function renderPage(tab){
   if (filters.booksArc && !arcById(filters.booksArc)) filters.booksArc = null;
   if (filters.charsBook && !bookById(filters.charsBook)) filters.charsBook = '';
   tab = tab || activeTab;
-  if (ELEMENT_TABS.includes(tab) && navMode() !== 'rail') page.append(elementTabs(tab)); // no telemóvel, os quatro estão em «Elementos»
-  ({ books:pageBooks, characters:pageChars, arcs:pageArcs, sceneries:pageSceneries, refs:pageRefs, plan:pagePlan, support:pageSupport, settings:pageSettings })[tab](page);
+  if (ELEMENT_TABS.includes(tab) && navMode() !== 'rail'){ // no telemóvel, os cinco estão em «Elementos»
+    page.append(elementTabs(tab)); }
+  ({ books:pageBooks, chapters:pageChapters, characters:pageChars, arcs:pageArcs, sceneries:pageSceneries, refs:pageRefs, plan:pagePlan, support:pageSupport, settings:pageSettings })[tab](page);
+  /* o separador escolhido fica sempre à vista, mesmo quando a fila não cabe no ecrã (mede-se no fim: a lista pode trazer a barra de deslocação) */
+  const et = page.querySelector('.el-tabs'), on = et && et.querySelector('.on');
+  if (on){ const r = on.getBoundingClientRect(), e = et.getBoundingClientRect(); if (r.left < e.left + 12) et.scrollLeft += r.left - e.left - 12; else if (r.right > e.right - 12) et.scrollLeft += r.right - e.right + 12; }
 }
 /* ---------- listas de elementos: a mesma barra em todas (procurar, ordenar, cartões ou linhas), iniciais e presença ---------- */
 const LS_LAYOUT = 'narrativa.listas';
@@ -126,8 +132,9 @@ function listPage(page, tab, title, filterEls, actions, sorts, items, emptyMsg){
   ListUI.redraw = draw; draw();
 }
 function pageBooks(page){
-  const list = () => state.books.filter(b => (!filters.booksChar || bookCharacters(b).some(x => x.ch.id === filters.booksChar)) && (!filters.booksArc || bookArcIds(b).includes(filters.booksArc)));
-  listPage(page, 'books', _('Tomos e Capítulos'),
+  const list = () => booksFiltered();
+  const split = navMode() !== 'rail'; // telemóvel: Tomos e Capítulos em separadores próprios, dentro de «Elementos»
+  listPage(page, 'books', split ? _('Tomos') : _('Tomos e Capítulos'),
     [filterBox(_('Personagem'), charItems, filters.booksChar, v => filters.booksChar = v), filterBox(_('Arco Narrativo'), arcItems, filters.booksArc, v => filters.booksArc = v)],
     [h('button', {class:'btn primary', onclick:() => { filters.booksChar = filters.booksArc = null; addBook(); }}, _('+ Novo Tomo'))],
     [['order', _('Ordenar: ordem do livro')], SORT_NAME, SORT_SCENES],
@@ -140,11 +147,29 @@ function pageBooks(page){
           h('div', {class:'muted small'}, n ? n.name : _('Narrador por definir')), h('div', {class:'muted small'}, meta),
           h('div', {class:'chips', style:{marginTop:'8px'}}, bookArcIds(b).map(a => arcById(a) && h('span', {class:'dot', title:arcById(a).name, style:{background:arcStroke(arcById(a))}}))))}; }),
     () => _('Nenhum Tomo corresponde aos filtros.'));
+  if (split) return;
   /* por baixo dos Tomos, os Capítulos (dos Tomos à vista): mesma procura, mesma ordenação e mesma disposição */
   const prev = ListUI.redraw, hd = h('div', {class:'list-sub'}), cbox = h('div', {class:'list-box'}), thd = h('h2', {class:'list-subt'}, _('Tomos'));
   page.querySelector('.list-box').before(thd); page.append(hd, cbox);
-  const chapters = () => { const out = [];
-    list().forEach(b => { const bi = state.books.indexOf(b); b.chapters.forEach((c, ci) => { const sc = chapterScenes(c), ids = new Set(sc.map(s => s.id));
+  const chapters = () => chapterItems(list());
+  const drawCh = () => { const items = chapters();
+    hd.replaceChildren(h('h2', {class:'list-subt'}, _('Capítulos'), h('span', {class:'muted small'}, ' · ' + items.length)), h('span', {class:'spacer'}), h('button', {class:'btn', onclick:() => newChapterDialog()}, _('+ Novo Capítulo')));
+    cbox.replaceChildren(listBody('books', items, state.books.some(b => b.chapters.length) ? _('Nenhum Capítulo corresponde aos filtros.') : _('Ainda não existem Capítulos.'), 'order')); };
+  ListUI.redraw = () => { prev(); drawCh(); }; drawCh();
+}
+/* os Tomos que passam nos filtros (Personagem e Arco Narrativo): os mesmos para os Tomos e para os Capítulos */
+const booksFiltered = () => state.books.filter(b => (!filters.booksChar || bookCharacters(b).some(x => x.ch.id === filters.booksChar)) && (!filters.booksArc || bookArcIds(b).includes(filters.booksArc)));
+/* telemóvel: os Capítulos num separador seu, com a mesma procura, filtros e disposição */
+function pageChapters(page){
+  listPage(page, 'chapters', _('Capítulos'),
+    [filterBox(_('Personagem'), charItems, filters.booksChar, v => filters.booksChar = v), filterBox(_('Arco Narrativo'), arcItems, filters.booksArc, v => filters.booksArc = v)],
+    [h('button', {class:'btn primary', onclick:() => newChapterDialog()}, _('+ Novo Capítulo'))],
+    [['order', _('Ordenar: ordem do livro')], SORT_NAME, SORT_SCENES],
+    () => chapterItems(booksFiltered()),
+    () => state.books.some(b => b.chapters.length) ? _('Nenhum Capítulo corresponde aos filtros.') : _('Ainda não existem Capítulos.'));
+}
+function chapterItems(books){ const out = [];
+  books.forEach(b => { const bi = state.books.indexOf(b); b.chapters.forEach((c, ci) => { const sc = chapterScenes(c), ids = new Set(sc.map(s => s.id));
       if (filters.booksChar && !sc.some(s => s.pov === filters.booksChar || s.chars.includes(filters.booksChar))) return;
       if (filters.booksArc && !sc.some(s => s.arcId === filters.booksArc)) return;
       const w = chapterProg(c, 'write'), rv = chapterProg(c, 'review'), go = () => { setTab('board'); if (narrView() !== 'list') revealChapter(c.id); else revealChapter(c.id); };
@@ -154,11 +179,7 @@ function pageBooks(page){
         card:() => h('div', {class:'card ch-card', dataset:{chapter:c.id}, onclick:go}, b.color ? h('div', {class:'bar', style:{background:b.color}}) : null,
           h('div', {class:'kicker'}, _('Tomo {n}', {n:bi + 1}) + ' · ' + _('Capítulo {n}', {n:ci + 1})), h('h3', null, c.name || _('Sem título')),
           h('div', {class:'muted small'}, b.name), h('div', {class:'muted small'}, meta), layerBar('chapter', c, 'in-card'))}); }); });
-    return out; };
-  const drawCh = () => { const items = chapters();
-    hd.replaceChildren(h('h2', {class:'list-subt'}, _('Capítulos'), h('span', {class:'muted small'}, ' · ' + items.length)), h('span', {class:'spacer'}), h('button', {class:'btn', onclick:() => newChapterDialog()}, _('+ Novo Capítulo')));
-    cbox.replaceChildren(listBody('books', items, state.books.some(b => b.chapters.length) ? _('Nenhum Capítulo corresponde aos filtros.') : _('Ainda não existem Capítulos.'), 'order')); };
-  ListUI.redraw = () => { prev(); drawCh(); }; drawCh();
+  return out;
 }
 function pageChars(page){
   const seg = h('div', {class:'seg'}, [['all', _('Todos')], ['main', _('Personagens Principais')], ['side', _('Personagens Secundárias')]].map(([k, l]) =>
@@ -266,10 +287,10 @@ function pageSettings(page, inDrawer){
   const p = state.project.palette;
   const palBtn = pal => { const v = paletteVars(pal);
     // a paleta escolhida dá o tom ao projeto e o modo (claro ou escuro) a este dispositivo — escolha que fica lembrada
-    return h('button', {class:'pal' + (pal.h === p.h && pal.mode === effectiveMode() ? ' on' : ''), onclick:() => { state.project.palette = {h:pal.h, mode:pal.mode}; lsSet(LS_THEME, pal.mode); lsSet(LS_PAL, String(pal.h)); applyPalette(); commit(); }},
+    return h('button', {class:'pal' + (palOn(pal, p) ? ' on' : ''), onclick:() => { choosePal(pal); commit(); }},
       h('div', {class:'sw'}, ['--bg', '--surface2', '--border', '--accent', '--text'].map(k => h('span', {style:{background:v[k]}}))), h('div', {class:'small'}, pal.name)); };
-  const pals = [...PRESET_PALETTES, ...extraPalettes]; // uma paleta gerada numa sessão anterior continua a aparecer, como «Atual»
-  if (!pals.some(x => x.h === p.h && x.mode === effectiveMode())) pals.push({name:_('Atual'), h:p.h, mode:effectiveMode()});
+  const pals = palChoices([...PRESET_PALETTES, ...extraPalettes]); // uma paleta gerada numa sessão anterior continua a aparecer, como «Atual»
+  if (!pals.some(x => palOn(x, p))) pals.push({name:_('Atual'), h:p.h, mode:effectiveMode()});
   const set = h('div', {class:'settings'},
     inDrawer ? installCard() : h('div', {class:'page-head'}, h('h1', null, _('Definições do Projeto'))), // no telemóvel, instalar como app vem primeiro
     h('div', {class:'card static'}, field(_('Nome do Projeto'), h('input', {class:'inp', value:state.project.name, oninput:e => { state.project.name = e.target.value || _('Projeto'); save(); $('#projName').textContent = state.project.name; document.title = state.project.name + ' — Narrative'; }}))),
@@ -282,8 +303,8 @@ function pageSettings(page, inDrawer){
         h('span', null, _('Perguntar antes de sair, se houver projetos por guardar em ficheiro')))),
     syncCard(),
     h('div', {class:'card static theme-card'}, h('h3', null, _('Tema e paleta de cores')),
-      h('p', {class:'muted small'}, _('Por omissão, a ferramenta segue o tema do sistema (claro ou escuro). Se escolher outro, fica lembrado neste dispositivo. A paleta dá o tom das cores ao projeto.')),
-      h('div', {class:'seg theme-seg', role:'radiogroup', 'aria-label':_('Tema')}, [['auto', _('Automático (segue o sistema)')], ['light', _('Claro')], ['dark', _('Escuro')]].map(([k, l]) =>
+      h('p', {class:'muted small'}, followsDevice() ? _('A paleta dá o tom das cores ao projeto.') : _('Por omissão, a ferramenta segue o tema do sistema (claro ou escuro). Se escolher outro, fica lembrado neste dispositivo. A paleta dá o tom das cores ao projeto.')),
+      followsDevice() ? h('p', {class:'small theme-auto'}, _('No telemóvel, claro ou escuro segue sempre o aparelho: muda sozinho quando o aparelho muda.')) : h('div', {class:'seg theme-seg', role:'radiogroup', 'aria-label':_('Tema')}, [['auto', _('Automático (segue o sistema)')], ['light', _('Claro')], ['dark', _('Escuro')]].map(([k, l]) =>
         h('button', {class:themePref() === k ? 'on' : '', role:'radio', 'aria-checked':String(themePref() === k), onclick:() => setTheme(k)}, l))),
       h('div', {style:{height:'12px'}}),
       h('div', {class:'palettes'}, pals.map(palBtn)),
@@ -401,7 +422,7 @@ window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());
 window.addEventListener('DOMContentLoaded', () => {
   state = loadState(); applyPalette(); initBoard();
-  const t0 = ssGet(SS_TAB); if (TABS.some(t => t[0] === t0) && !(t0 === 'settings' && MOBILE_Q.matches)) activeTab = t0; // no telemóvel, as Definições começam fechadas
+  const t0 = ssGet(SS_TAB); if ((TABS.some(t => t[0] === t0) || t0 === 'chapters') && !(t0 === 'settings' && MOBILE_Q.matches)) activeTab = t0; // no telemóvel, as Definições começam fechadas
   renderAll(); histInit();
   $('#undoBtn').addEventListener('click', undo); $('#redoBtn').addEventListener('click', redo);
   purgeOrphanFiles().catch(() => {}); initApp();
