@@ -1203,3 +1203,6 @@ body.head-slim .book-actions{top:50%;translate:0 -50%}
 body.head-slim .lbar.on-head{bottom:2px;height:3px}
 /* dois dedos ampliam e reduzem o quadro: o navegador não amplia a página nesse sítio */
 body:not([data-nav=rail]) #board-scroll{touch-action:pan-x pan-y}
+/* página inicial: o aviso de privacidade no fim, alinhado como a lista dos projetos recentes */
+.land-privacy{text-align:left;margin-top:28px}
+.land-privacy .privacy-card{margin:0}

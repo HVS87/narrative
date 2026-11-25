@@ -87,7 +87,7 @@ const check = (name, ok, info) => { R.push({name, ok}); console.log((ok ? '  ✓
     const vNew = v0.split('.').map((x, i) => i === 2 ? +x + 1 : x).join('.');
     published = fs.readFileSync(path.join(root, 'js/version.js'), 'utf8').replace('"version":"' + v0 + '"', '"version":"' + vNew + '"');
     await ev('Upd.lastInput = 0; updCheck(false); 1');
-    let vNow = v0; for (let i = 0; i < 60 && vNow === v0; i++){ await W(500); try { vNow = await ev('typeof APP_RELEASE === "object" ? APP_RELEASE.version : "?"'); } catch (e) {} }
+    let vNow = v0; for (let i = 0; i < 120 && vNow !== vNew; i++){ /* a meio da recarga, a página ainda não tem versão («?»): continua-se à espera da nova */ await W(500); try { vNow = await ev('typeof APP_RELEASE === "object" ? APP_RELEASE.version : "?"'); } catch (e) {} }
     check('publicada uma versão nova, a app encontra-a, descarrega-a e recarrega sozinha', vNow === vNew, v0 + ' → ' + vNow);
     await W(800);
     const cache1 = await ev('caches.keys().then(k => k.join(","))');
@@ -154,6 +154,42 @@ const check = (name, ok, info) => { R.push({name, ok}); console.log((ok ? '  ✓
     await go(BASE);
     check('modo instalado reconhecido no telemóvel', await ev(`isInstalledApp() && document.querySelector('#installBtn').hidden`));
     await c.send('Page.removeScriptToEvaluateOnNewDocument', {identifier:fake2.identifier});
+
+    console.log('Telemóvel: quadro com dois dedos, cabeçalhos presos, tema do aparelho, Elementos e aviso de privacidade');
+    await c.send('Emulation.setDeviceMetricsOverride', {width:915, height:412, deviceScaleFactor:2.6, mobile:true}); await W(300);
+    await ev(`(closeAllModals(), state = sanitize(demoProject()), commit(), ViewPref.mzoom = 1, lsSet(LS_MZOOM, '1'), setTab('board'), 1)`); await W(500);
+    const pz0 = await ev(`(() => { const sc = document.querySelector('#board-scroll'), r = sc.getBoundingClientRect(); sc.scrollLeft = 600;
+      return {z:Z(), x:Math.round(r.left + r.width / 2), y:Math.round(r.top + 150), nav:navMode(), slim:document.body.classList.contains('head-slim'), hb:Math.round(document.querySelector('.book-head').getBoundingClientRect().height)}; })()`);
+    const tp = (type, d) => c.send('Input.dispatchTouchEvent', {type, touchPoints:d == null ? [] : [{x:pz0.x - d / 2, y:pz0.y, id:1}, {x:pz0.x + d / 2, y:pz0.y, id:2}]});
+    await tp('touchStart', 300); for (let i = 1; i <= 10; i++){ await tp('touchMove', 300 - i * 15); await W(20); } await tp('touchEnd'); await W(400);
+    const pz1 = await ev(`({z:Z(), saved:lsGet(LS_MZOOM), modals:openModals.length, page:Math.round(visualViewport.scale * 100) / 100})`);
+    check('deitado: dois dedos a sério reduzem o quadro (e não a página), fica lembrado; o cabeçalho do Tomo ocupa uma linha',
+      pz0.nav === 'compact' && pz0.slim && pz0.hb === 30 && pz1.z < .7 && pz1.saved === String(pz1.z) && !pz1.modals && pz1.page === 1, JSON.stringify([pz0, pz1]));
+    await tp('touchStart', 100); for (let i = 1; i <= 10; i++){ await tp('touchMove', 100 + i * 30); await W(20); } await tp('touchEnd'); await W(400);
+    const pz2 = await ev('Z()'); check('e a afastar os dedos, volta a ampliar', pz2 > pz1.z + .3, pz1.z + ' → ' + pz2);
+    const st = await ev(`(async () => { const W = ms => new Promise(r => setTimeout(r, ms)), sc = document.querySelector('#board-scroll'); sc.scrollLeft = Math.round(sc.scrollWidth * .45); await W(300);
+      const g = document.querySelector('#gutter').getBoundingClientRect().right, nums = [...document.querySelectorAll('#headLayer .ch-head.stuck .ch-num')].map(n => Math.round(n.getBoundingClientRect().left)),
+        kick = [...document.querySelectorAll('#headLayer .book-head.stuck .book-kicker')].map(n => Math.round(n.getBoundingClientRect().left));
+      sc.scrollLeft = 0; await W(300); return {g:Math.round(g), nums, kick, back:document.querySelectorAll('#headLayer .stuck').length}; })()`);
+    check('ao deslocar o quadro, o número e o nome do Tomo e do Capítulo vão consigo, encostados à coluna dos Arcos; no início, no lugar de sempre',
+      st.nums.some(x => Math.abs(x - st.g) < 24) && st.kick.some(x => x >= st.g - 2 && x < st.g + 40) && st.back === 0, JSON.stringify(st));
+    await ev(`(ViewPref.mzoom = 1, lsSet(LS_MZOOM, '1'), lsSet(LS_THEME, 'dark'), renderAll(), 1)`);
+    await c.send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme', value:'light'}]}); await W(400); const th1 = await ev('document.documentElement.dataset.mode');
+    await c.send('Emulation.setEmulatedMedia', {features:[{name:'prefers-color-scheme', value:'dark'}]}); await W(400); const th2 = await ev('document.documentElement.dataset.mode');
+    await c.send('Emulation.setEmulatedMedia', {features:[]}); await ev(`(localStorage.removeItem(LS_THEME), applyPalette(), 1)`);
+    check('claro ou escuro muda sozinho com o aparelho, mesmo com «Escuro» escolhido antes', th1 === 'light' && th2 === 'dark', th1 + ' / ' + th2);
+    await c.send('Emulation.setDeviceMetricsOverride', {width:412, height:915, deviceScaleFactor:2.6, mobile:true}); await W(300);
+    const el = await ev(`(async () => { const W = ms => new Promise(r => setTimeout(r, ms)); ListUI.layout = 'cards'; setTab('board'); await W(100); document.querySelector('#bnav .nav-item[data-tab="elements"]').click(); await W(200);
+      const tabs = [...document.querySelectorAll('.el-tabs button')].map(b => b.textContent).join(','), books = document.querySelectorAll('#view-page .card').length;
+      [...document.querySelectorAll('.el-tabs button')].find(b => b.textContent === 'Capítulos').click(); await W(200);
+      const out = {tabs, books, nb:state.books.length, h1:document.querySelector('#view-page h1').textContent, n:document.querySelectorAll('#view-page .ch-card').length, total:state.books.reduce((n, b) => n + b.chapters.length, 0), wide:document.documentElement.scrollWidth <= innerWidth};
+      [...document.querySelectorAll('.el-tabs button')].pop().click(); await W(200); const on = document.querySelector('.el-tabs button.on').getBoundingClientRect(); out.lastSeen = on.right <= innerWidth + 1 && on.left >= 0; return out; })()`);
+    check('Elementos: Tomos e Capítulos em separadores próprios, todos os Capítulos, o separador escolhido sempre à vista',
+      el.tabs === 'Tomos,Capítulos,Arcos Narrativos,Personagens,Localizações' && el.books === el.nb && el.h1 === 'Capítulos' && el.n === el.total && el.wide && el.lastSeen, JSON.stringify(el));
+    const pv = await ev(`(async () => { const W = ms => new Promise(r => setTimeout(r, ms)), keep = Projects.idx.active; Projects.idx.active = null; projActivate(null); await W(300);
+      const c = document.querySelector('#landing .land-privacy'), r = c ? c.getBoundingClientRect() : {}, t = c ? c.textContent : '';
+      Projects.idx.active = keep; projActivate(keep); return {dev:t.includes('gravados no seu aparelho'), pc:t.includes('computador'), all:t.includes('Não há contas') && t.includes('encriptado'), fits:r.left >= 0 && r.right <= innerWidth}; })()`);
+    check('no telemóvel, o aviso de privacidade no fim da página inicial fala do aparelho', pv.dev && !pv.pc && pv.all && pv.fits, JSON.stringify(pv));
 
     if (process.argv.includes('--shots')){
       console.log('Capturas para o ecrã de instalação');

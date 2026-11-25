@@ -2037,6 +2037,45 @@ window.__qa = (async () => {
       eq(E('navMode()'), 'rail'); eq(E('activeTab'), 'books', 'no PC não há separador dos Capítulos'); ok(q('#view-page .list-sub') && qa('#view-page .ch-card').length === nCh, 'os Capítulos por baixo dos Tomos'); });
     setTab('chapters'); await W(20); eq(activeTab, 'books', 'no PC, pedir os Capítulos mostra a página dos Tomos'); eq($('#view-page h1').textContent, 'Tomos e Capítulos'); ok($('#view-page .list-sub'));
     ok(!TOUR_STEPS.find(s => s.sel === '.el-tabs').when(), 'no PC, a visita mostra a página como antes'); setTab('board'); fx(); });
+  await T('AD01 aviso de privacidade: no fim da página inicial, além das boas-vindas e do fim das Definições — no PC e no telemóvel', async () => {
+    const full = el => el && el.textContent.includes('gratuita e sem fins lucrativos') && el.textContent.includes(onPhoneOrTablet() ? 'gravados no seu aparelho' : 'gravados no seu computador') && el.textContent.includes('não recolhe nenhuns dados nem analytics')
+      && el.textContent.includes('Não há contas, publicidade, cookies de terceiros nem estatísticas de utilização') && el.textContent.includes('passa encriptado diretamente de um para o outro');
+    closeProject(); await W(20); if (modals().length){ const b = btn('Fechar sem guardar', topModal()); b && b.click(); await W(40); } ok(projNone());
+    const L = $('#landing'), pc = L.querySelector('.land-privacy .privacy-card'); ok(full(pc), 'na página inicial, o aviso inteiro'); eq(L.querySelector('.land').lastElementChild, pc && pc.parentElement, 'no fim da página');
+    ok(pc && pc.getAttribute('role') === 'note' && pc.querySelector('h3').textContent.includes('Privacidade'), 'com título e papel de nota');
+    Projects.idx.recent.length || ok(true); renderLanding(L); ok(full(L.querySelector('.land-privacy')), 'também quando há projetos recentes');
+    eq(onPhoneOrTablet() ? privacyText() : privacyText().includes('computador'), true, 'no PC, diz «computador»');
+    localStorage.removeItem(LS_PRIV); welcomeIfNeeded(); await W(30); ok(full(topModal()), 'nas boas-vindas, o mesmo aviso'); btn('Começar').click(); await W(20);
+    $('#landing .land-card').click(); await W(30); ok(!projNone()); setTab('settings'); await W(20); { const cs = [...$('#view-page .settings').children]; ok(full(cs[cs.length - 1]), 'no fim das Definições'); }
+    await phone(390, 800, async (w, d) => { w.eval('Projects.idx.active = null; projActivate(null)'); await W(80); const c = d.querySelector('#landing .land-privacy .privacy-card');
+      ok(c && c.textContent.includes('Não há contas'), 'no telemóvel, na página inicial'); const r = c.getBoundingClientRect(); ok(r.left >= 0 && r.right <= 390, 'e cabe no ecrã: ' + [r.left, r.right]);
+      w.eval("Projects.idx.active = Projects.idx.open[0]; projActivate(Projects.idx.active); setTab('settings')"); await W(300);
+      const cs = [...d.querySelectorAll('#setDrawer .settings > *, #view-page .settings > *')]; ok(cs.length && cs[cs.length - 1].classList.contains('privacy-card'), 'no telemóvel, no fim das Definições'); });
+    setTab('board'); fx(); });
+  await T('AE01 telemóvel: paletas da página inicial e das boas-vindas no modo do aparelho; rodar troca o cabeçalho do Tomo; dois dedos na Lista não mexem no quadro', async () => {
+    await keepLS([LS_THEME, LS_PAL, LS_MZOOM], async () => { lsSet(LS_THEME, 'light'); bigBook();
+      await phone(390, 800, async (w, d) => { const E = x => w.eval(x), os = w.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        E('Projects.idx.active = null; projActivate(null)'); await W(80); ok(d.body.classList.contains('no-project'));
+        d.querySelector('#palBtn').click(); await W(30); const names = [...d.querySelectorAll('.pal-menu .pal-item')].map(x => x.textContent.replace('✓', '').trim());
+        eq(names.length, 7, 'sem a paleta repetida (Meia-noite e Papel são a mesma cor): ' + names); ok(!names.includes(os === 'dark' ? 'Papel' : 'Meia-noite'), 'a de 220° com o nome do modo do aparelho');
+        ok(![...d.querySelectorAll('.pal-menu .ctx-item')].some(i => /seguir o sistema/.test(i.textContent)), 'no telemóvel, não há «seguir o sistema»: segue sempre');
+        [...d.querySelectorAll('.pal-menu .ctx-item')].find(i => i.textContent.includes('Vinho')).click(); await W(30);
+        eq([E('state.project.palette.h'), E('lsGet(LS_THEME)'), E('lsGet(LS_PAL)'), d.documentElement.dataset.mode], [345, 'light', '345', os], 'muda a cor, lembra-a para os projetos novos, e o modo continua a ser o do aparelho');
+        E("localStorage.removeItem(LS_PRIV); welcomeIfNeeded()"); await W(40); const picks = [...d.querySelectorAll('.welcome-modal .pal-pick')]; eq(picks.length, 7, 'nas boas-vindas, as mesmas sete');
+        ok(picks.find(p => p.title === 'Vinho').classList.contains('on'), 'com a escolhida assinalada'); picks.find(p => p.title === 'Floresta').click(); await W(20); eq(E('state.project.palette.h'), 150); E("lsSet(LS_PRIV, '1'); closeAllModals()");
+        E('Projects.idx.active = Projects.idx.open[0]; projActivate(Projects.idx.active)'); await W(80);
+        // ao alto: a Lista; dois dedos aí não mudam a ampliação do quadro
+        eq(E('narrView()'), 'list', 'ao alto, a Narrativa abre em Lista'); const nl = d.querySelector('#narrList'); if (typeof w.TouchEvent === 'function' && typeof w.Touch === 'function'){
+          const T = (id, x) => new w.Touch({identifier:id, target:nl, clientX:x, clientY:300}), ev = (t, ts) => nl.dispatchEvent(new w.TouchEvent(t, {touches:ts, changedTouches:ts, bubbles:true, cancelable:true}));
+          ev('touchstart', [T(1, 100), T(2, 300)]); ev('touchmove', [T(1, 180), T(2, 220)]); ev('touchend', []); await W(20); }
+        E("Narr.view = 'board'; renderAll()"); await W(40); eq(E('Z()'), E('ViewPref.mzoom'), 'o quadro tem a ampliação lembrada, não mexida na Lista');
+        ok(!d.body.classList.contains('head-slim'), 'ao alto: cabeçalho do Tomo em duas linhas'); eq(E('HEAD_H'), 88);
+        // rodar: deitado, numa linha; e de novo ao alto
+        w.frameElement.style.width = '800px'; w.frameElement.style.height = '380px'; await W(300); if (E('navMode()') === 'compact' && !d.body.classList.contains('head-slim')) E('renderAll()'); /* sem desenho, o aviso da mudança de tamanho pode não chegar */
+        eq(E('navMode()'), 'compact'); E("setTab('board')"); await W(40); ok(d.body.classList.contains('head-slim'), 'deitado: numa linha'); eq(E('HEAD_H'), 64); eq(Math.round(d.querySelector('.book-head').getBoundingClientRect().height), 30);
+        w.frameElement.style.width = '390px'; w.frameElement.style.height = '800px'; await W(300); if (E('navMode()') === 'bottom' && d.body.classList.contains('head-slim')) E('renderAll()');
+        E("Narr.view = 'board'; renderAll()"); await W(40); ok(!d.body.classList.contains('head-slim'), 'de novo ao alto: duas linhas'); eq(Math.round(d.querySelector('.book-head').getBoundingClientRect().height), 54); }); });
+    state.project.palette = {h:220, mode:'dark'}; applyPalette(); fx(); });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };

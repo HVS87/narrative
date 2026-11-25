@@ -321,7 +321,8 @@ function renderLanding(L){
         return h('div', {class:'list-row land-proj'}, projThumb(id), h('button', {class:'grow land-reopen', onclick:() => projReopen(id)}, h('b', null, m.name),
           h('span', {class:'muted small'}, m.closedAt ? _(' · fechado a {data}', {data:new Date(m.closedAt).toLocaleString(LOCALE, {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}) : '', m.dirty ? _(' · com alterações por guardar em ficheiro') : '')),
           h('button', {class:'btn small' + (i === 0 ? ' primary' : ''), onclick:() => projReopen(id)}, i === 0 ? _('Continuar') : _('Reabrir')), h('button', {class:'btn small', 'aria-label':_('Remover {nome}', {nome:m.name}), onclick:() => projForget(id)}, _('Remover'))); }))
-      : null));
+      : null,
+    h('div', {class:'land-privacy'}, privacyCard()))); // o aviso de privacidade, sempre à vista no ecrã de boas-vindas (como no fim das Definições)
 }
 
 /* ---------- importar de outro projeto aberto: Personagens, Localizações e Referências ----------
