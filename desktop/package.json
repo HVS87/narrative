@@ -1,7 +1,7 @@
 {
   "name": "narrative",
   "productName": "Narrative",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Narrative: a free, private tool to build, map and rearrange stories.",
   "author": "Narrative",
   "license": "UNLICENSED",
@@ -98,5 +98,8 @@
   "allowScripts": {
     "electron@33.2.1": true
   },
-  "homepage": "https://hvs87.github.io/narrative/"
+  "homepage": "https://hvs87.github.io/narrative/",
+  "dependencies": {
+    "electron-updater": "6.3.9"
+  }
 }

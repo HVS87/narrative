@@ -30,6 +30,39 @@ app.on('second-instance', () => { const w = BrowserWindow.getAllWindows()[0]; if
 
 ipcMain.on('narrativa-desktop-version', e => { e.returnValue = app.getVersion(); });
 
+/* ---------- atualizar o próprio programa (a «moldura» que abre a ferramenta) ----------
+   A ferramenta em si atualiza-se pelo site, em todos os formatos. O programa também se atualiza sozinho onde isso é possível
+   sem voltar a instalar: o instalador do Windows e o AppImage do Linux. Descarrega a versão nova da release do GitHub (a mesma
+   página de onde foi instalado) e instala-a ao fechar, na mesma pasta: os projetos, as preferências e a sincronização ficam
+   nos dados da aplicação, que não são tocados. A versão portátil do Windows, o macOS (sem assinatura da Apple) e o .tar.gz
+   não se podem substituir a si próprios: aí continua a valer só a atualização da ferramenta pelo site.
+   Quem decide quando procurar é a ferramenta (a opção «Procurar sempre atualizações ao iniciar» e o botão das Definições). */
+let updater = null;
+const shellCan = () => !!updater && app.isPackaged && !process.env.PORTABLE_EXECUTABLE_DIR && !process.env.NARRATIVA_NO_SHELL_UPDATE
+  && (process.platform === 'win32' || (process.platform === 'linux' && !!process.env.APPIMAGE));
+const Shell = { state:shellCan() ? 'idle' : 'unsupported', version:null, error:null };
+function shellSend(){ for (const w of BrowserWindow.getAllWindows()) try { w.webContents.send('narrativa-shell-update', {...Shell}); } catch(e){} }
+function shellSet(o){ Object.assign(Shell, o); shellSend(); }
+function shellInit(){
+  try { ({ autoUpdater:updater } = require('electron-updater')); } catch(e){ updater = null; }
+  Shell.state = shellCan() ? 'idle' : 'unsupported'; if (!shellCan()) return;
+  updater.autoDownload = true; updater.autoInstallOnAppQuit = true; updater.allowDowngrade = false; updater.logger = null;
+  updater.on('checking-for-update', () => shellSet({state:'checking', error:null}));
+  updater.on('update-not-available', () => shellSet({state:'current'}));
+  updater.on('update-available', i => shellSet({state:'downloading', version:i && i.version}));
+  updater.on('update-downloaded', i => shellSet({state:'ready', version:i && i.version}));
+  updater.on('error', e => shellSet({state:'error', error:String(e && e.message || e).slice(0, 200)}));
+}
+ipcMain.handle('narrativa-shell-check', async () => {
+  if (!shellCan()) return {...Shell};
+  if (Shell.state === 'checking' || Shell.state === 'downloading' || Shell.state === 'ready') return {...Shell};
+  try { await updater.checkForUpdates(); } catch(e){ shellSet({state:'error', error:String(e && e.message || e).slice(0, 200)}); }
+  return {...Shell};
+});
+ipcMain.handle('narrativa-shell-state', () => ({...Shell}));
+// «Reiniciar e atualizar»: fecha (a ferramenta já gravou tudo e pergunta se houver algo por guardar em ficheiro) e instala
+ipcMain.handle('narrativa-shell-install', () => { if (Shell.state !== 'ready') return false; setImmediate(() => { try { session.defaultSession.flushStorageData(); } catch(e){} updater.quitAndInstall(true, true); }); return true; });
+
 const inApp = url => { try { const u = new URL(url); return u.origin === ORIGIN && u.href.startsWith(BASE); } catch(e){ return false; } };
 
 function readState(){ try { return JSON.parse(fs.readFileSync(STATE_FILE(), 'utf8')); } catch(e){ return null; } }
@@ -73,6 +106,7 @@ function createWindow(){
 }
 
 app.whenReady().then(() => {
+  shellInit();
   // no macOS, o menu da aplicação é o que dá Copiar, Colar, Anular e Sair (⌘C, ⌘V, ⌘Z, ⌘Q); no Windows e no Linux não há menu
   Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([{role:'appMenu'}, {role:'editMenu'}, {role:'windowMenu'}]) : null);
   try { const av = session.defaultSession.availableSpellCheckerLanguages || []; const want = [app.getLocale(), 'pt-PT', 'en-US', 'es-ES', 'fr-FR'].filter((l, i, a) => av.includes(l) && a.indexOf(l) === i); if (want.length) session.defaultSession.setSpellCheckerLanguages(want); } catch(e){}

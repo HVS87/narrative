@@ -70,6 +70,14 @@ const kill = p => { try { execSync(`taskkill /PID ${p.pid} /T /F`, {stdio:'ignor
     check('primeira abertura sem projetos: página inicial', await pc.ev(`projNone() && !document.querySelector('#landing').hidden`));
     await pc.ev(`newProject(); state.project.name = 'Romance do PC'; state.books[0].name = 'Livro um'; commit(); flushSave(); setTab('settings'); 1`);
     check('Definições: «Está a usar a aplicação para PC»', await pc.ev(`!!document.querySelector('[data-install="desktop"]')`));
+    // atualizar o próprio programa: o instalador do Windows procura na release do GitHub (a mesma de onde foi instalado)
+    check('o programa expõe só o necessário para se atualizar (procurar, estado, instalar)', await pc.ev(`['check', 'state', 'install', 'on'].every(k => typeof narrativaDesktop.shell[k] === 'function') && Object.keys(narrativaDesktop).sort().join() === 'platform,shell,version'`));
+    const sh1 = await until(pc, `Upd.shell && ['current', 'downloading', 'ready', 'error'].includes(Upd.shell.state) && JSON.stringify(Upd.shell)`, 40000);
+    check('ao iniciar, o programa procura sozinho uma versão nova de si próprio', !!sh1 && /"current"|"downloading"|"ready"/.test(sh1), sh1);
+    check('nas Definições, «Programa para PC» com a versão e o estado', await pc.ev(`(() => { const r = document.querySelector('.upd-card .upd-shell'); return !!r && r.textContent.includes('Programa para PC: ' + narrativaDesktop.version) && /atualizado|descarregar|pronta/.test(r.textContent); })()`), await pc.ev(`(document.querySelector('.upd-card .upd-shell') || {}).textContent`));
+    await pc.ev(`(Upd.shell = null, [...document.querySelectorAll('.upd-card button')].find(b => b.textContent === 'Procurar atualizações').click(), 1)`);
+    const sh2 = await until(pc, `Upd.shell && ['current', 'downloading', 'ready', 'error'].includes(Upd.shell.state) && JSON.stringify(Upd.shell)`, 40000);
+    check('o botão «Procurar atualizações» também procura uma versão nova do programa', !!sh2 && /"current"|"downloading"|"ready"/.test(sh2), sh2);
 
     console.log('Telemóvel (Chrome em modo Android)');
     const ch = spawn(CHROME, ['--headless=new', '--no-first-run', '--disable-gpu', '--remote-debugging-port=9352', '--user-data-dir=' + phoneProf, BASE], {stdio:'ignore'}); procs.push(ch);
@@ -89,6 +97,7 @@ const kill = p => { try { execSync(`taskkill /PID ${p.pid} /T /F`, {stdio:'ignor
     check('o pedido do telemóvel chega ao .exe', !!asked);
     await pc.ev(`[...document.querySelectorAll('.modal .btn.primary')].find(b => b.textContent === 'Ligar').click(); 1`);
     check('ligados nos dois sentidos', !!(await until(pc, `[...Sync.links.values()].some(L => L.authed)`, 40000)) && !!(await until(phone, `[...Sync.links.values()].some(L => L.authed)`, 40000)));
+    check('cada um fica a saber a versão do outro (a apresentação leva-a)', !!(await until(pc, `[...Sync.links.values()].some(L => L.authed && L.ver === Upd.cur)`, 15000)) && !!(await until(phone, `[...Sync.links.values()].some(L => L.authed && L.ver === Upd.cur)`, 15000)));
     // o telemóvel ainda não tem nenhum projeto: recebe o do PC
     const other = await until(phone, `(() => { const L = [...Sync.links.values()].find(x => x.authed && x.other); return L && L.other.name; })()`, 30000);
     check('o telemóvel vê que o PC está noutro projeto', other === 'Romance do PC', other);

@@ -12,7 +12,7 @@ window.__qa = (async () => {
   function reset(){
     if (Tour.active) endTour();
     closeAllModals(); closeMenu(); drag = null; linkDrag = null; cancelPress(); suppressClick = false; suppressCtx = false;
-    endPickLink(); suppressUntil = 0; Quick.edit = null; Quick.made = null; clearInterval(Upd.waitI); Upd.state = 'idle'; Upd.remote = null; Upd.notes = ''; Upd.ready = false; try { localStorage.removeItem(LS_UPD); } catch (e) {} updUI(); Sync.links.clear(); Sync.cfg.pairs = []; Sync.peer = null; clearTimeout(Sync.sendT); Sync.status = 'off'; try { localStorage.removeItem(LS_BACKUP); } catch (e) {} syncUI(); lastPtr = 'mouse'; touchHold = false; knownReset = lsGet(LS_RESET); $('#dualBtn').hidden = false; Dual.role = 'main'; Dual.seen = 0; Dual.sel = null; Dual.follow = true; Dual.post = () => {}; document.body.classList.remove('second', 'dragging');
+    endPickLink(); suppressUntil = 0; Quick.edit = null; Quick.made = null; clearInterval(Upd.waitI); Upd.state = 'idle'; Upd.shell = null; Sync.lastMsg = 0; Upd.remote = null; Upd.notes = ''; Upd.ready = false; try { localStorage.removeItem(LS_UPD); } catch (e) {} updUI(); Sync.links.clear(); Sync.cfg.pairs = []; Sync.peer = null; clearTimeout(Sync.sendT); Sync.sendT = null; Sync.status = 'off'; try { localStorage.removeItem(LS_BACKUP); } catch (e) {} syncUI(); lastPtr = 'mouse'; touchHold = false; knownReset = lsGet(LS_RESET); $('#dualBtn').hidden = false; Dual.role = 'main'; Dual.seen = 0; Dual.sel = null; Dual.follow = true; Dual.post = () => {}; document.body.classList.remove('second', 'dragging');
     document.querySelectorAll('.toast').forEach(t => t.remove());
     /* um só projeto aberto, sempre o mesmo, como antes dos vários projetos */
     if (projNone()) projAdd(blankProject());
@@ -1001,7 +1001,7 @@ window.__qa = (async () => {
   await T('U03 instalação automática desligada: aparece «Atualizar» e é o utilizador que escolhe; uma atualização que não chegou não entra em ciclo', async () => {
     updSet({auto:false});
     await withRemote('99.0.0', async n => { await updCheck(false); ok(!$('#updBtn').hidden, 'botão na barra de topo'); ok(tipFor($('#updBtn'))); Upd.lastInput = 0; await W(1700); eq(n(), 0);
-      setTab('settings'); const card = $('.upd-card'); ok(card.textContent.includes('99.0.0') && card.textContent.includes('Coisas novas')); ok(!card.querySelector('input[type=checkbox]').checked);
+      setTab('settings'); const card = $('.upd-card'); ok(card.textContent.includes('99.0.0') && card.textContent.includes('Coisas novas')); ok(!card.querySelectorAll('input[type=checkbox]')[1].checked, 'a instalação automática desligada');
       eq([...card.querySelectorAll('button, .switch-wrap')].filter(el => !tipFor(el)).map(el => el.textContent), []);
       btn('Atualizar agora', card).click(); eq(n(), 1); });
     updSet({auto:true, tried:'99.0.0', triedAt:Date.now()});
@@ -2076,6 +2076,80 @@ window.__qa = (async () => {
         w.frameElement.style.width = '390px'; w.frameElement.style.height = '800px'; await W(300); if (E('navMode()') === 'bottom' && d.body.classList.contains('head-slim')) E('renderAll()');
         E("Narr.view = 'board'; renderAll()"); await W(40); ok(!d.body.classList.contains('head-slim'), 'de novo ao alto: duas linhas'); eq(Math.round(d.querySelector('.book-head').getBoundingClientRect().height), 54); }); });
     state.project.palette = {h:220, mode:'dark'}; applyPalette(); fx(); });
+  /* ----- atualizações: procurar ao iniciar, o botão, o programa para PC, os dados e a sincronização ----- */
+  await T('AF01 «Procurar sempre atualizações ao iniciar»: ligada por omissão; desligada, só o botão procura', async () => { fx(); localStorage.removeItem(LS_UPD);
+    eq(updCfg().onStart, true, 'ligada por omissão'); setTab('settings'); await W(20); let card = $('.upd-card');
+    const sw = card.querySelector('.upd-onstart input'); ok(sw && sw.checked, 'nas Definições, ligada'); ok(card.querySelector('.upd-onstart').textContent.includes('Procurar sempre atualizações ao iniciar'));
+    ok(card.textContent.includes('Procura ao abrir, de 30 em 30 minutos'), 'explica quando procura'); ok(tipFor(card.querySelector('.upd-onstart')).title === 'Procurar ao iniciar', 'explicador próprio');
+    ok(btn('Procurar atualizações', card) && tipFor(btn('Procurar atualizações', card)), 'o botão «Procurar atualizações»');
+    const real = window.updCheck; let calls = [];
+    window.updCheck = m => { calls.push(!!m); return Promise.resolve(); };
+    try {
+      updAutoCheck(); eq(calls, [false], 'ligada: ao abrir, de 30 em 30 minutos, ao voltar e com a internet de volta, procura');
+      sw.click(); await W(20); eq(updCfg().onStart, false, 'desligar fica guardado'); calls = [];
+      updAutoCheck(); updAutoCheck(); eq(calls, [], 'desligada: nenhuma procura automática');
+      card = $('.upd-card'); ok(card.textContent.includes('Só procura quando carregar em «Procurar atualizações»'));
+      btn('Procurar atualizações', card).click(); eq(calls, [true], 'o botão procura na mesma');
+      syncPeerVersion({pr:{id:'x', name:'Tel', ver:null}}, '99.0.0'); eq(calls, [true], 'desligada: nem quando o outro dispositivo tem uma versão mais recente');
+      card.querySelector('.upd-onstart input').click(); await W(20); eq(updCfg().onStart, true); eq(calls.length, 2, 'voltar a ligar procura logo');
+    } finally { window.updCheck = real; }
+    await withRemote(Upd.cur, async () => { btn('Procurar atualizações', $('.upd-card')).click(); await W(60); eq(Upd.state, 'current', 'o botão a sério: versão mais recente'); ok([...document.querySelectorAll('.toast')].some(t => t.textContent.includes('mais recente'))); });
+    setTab('board'); fx(); });
+  await T('AF02 atualizar não toca em nada: projetos, preferências, sincronização e cópias ficam como estavam', async () => { const f = fx();
+    lsSet(LS_THEME, 'dark'); lsSet(LS_PAL, '150'); setA11y('size', 'l'); lsSet(LS_MZOOM, '0.7'); updSet({auto:true, onStart:true});
+    Sync.cfg.pairs = [{id:'a'.repeat(20), secret:b64(randBytes(32)), name:'Telemóvel', at:Date.now()}]; syncSave();
+    f.a1.title = 'Antes de atualizar'; save(); flushSave();
+    const snap = () => { const o = {}; for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); o[k] = localStorage.getItem(k); } return o; };
+    const before = snap();
+    await withRemote('99.0.0', async n => { await updCheck(false); Upd.lastInput = 0; await W(1700); eq(n(), 1, 'atualizou'); });
+    const after = snap(), gone = Object.keys(before).filter(k => !(k in after)), changed = Object.keys(before).filter(k => k in after && after[k] !== before[k] && k !== LS_UPD);
+    eq(gone, [], 'nenhuma chave apagada'); eq(changed, [], 'nenhuma chave alterada (além do registo da própria atualização)');
+    eq(JSON.parse(localStorage.getItem(LS_KEY)).scenes[f.a1.id].title, 'Antes de atualizar'); eq(JSON.parse(lsGet(LS_SYNC)).pairs.length, 1, 'o emparelhamento continua');
+    eq([lsGet(LS_THEME), lsGet(LS_PAL), a11y().size, lsGet(LS_MZOOM)], ['dark', '150', 'l', '0.7'], 'as preferências continuam');
+    ok(await idb.get !== undefined, 'as Referências estão noutro sítio (IndexedDB), que a atualização não toca');
+    setA11y('size', 'm'); localStorage.removeItem(LS_MZOOM); localStorage.removeItem(LS_PAL); Sync.cfg.pairs = []; syncSave(); fx(); });
+  await T('AF03 sincronização: nunca atualiza a meio de uma troca de dados; diz a versão ao outro dispositivo e procura logo se a dele for mais recente', async () => { fx();
+    Upd.lastInput = 0; Upd.hidden = () => false; try {
+      ok(updSafe(), 'sem nada a meio: pode atualizar'); Sync.lastMsg = Date.now(); ok(!updSafe(), 'mensagens a chegar do outro dispositivo: espera'); Sync.lastMsg = Date.now() - 6000; ok(updSafe());
+      Sync.sendT = setTimeout(() => {}, 99999); ok(!updSafe(), 'um envio por fazer: espera'); clearTimeout(Sync.sendT); Sync.sendT = null;
+      const L0 = {pr:{id:'b'.repeat(20)}, conflict:{close(){}}}; Sync.links.set(L0.pr.id, L0); ok(!updSafe(), 'versões por escolher: espera'); Sync.links.clear();
+      const L1 = {pr:{id:'c'.repeat(20)}, want:'p123'}; Sync.links.set(L1.pr.id, L1); ok(!updSafe(), 'um projeto a chegar: espera'); Sync.links.clear(); ok(updSafe());
+    } finally { Upd.hidden = () => document.hidden; Sync.links.clear(); Sync.lastMsg = 0; }
+    await withRemote('99.0.0', async n => { Sync.lastMsg = Date.now(); const keep = setInterval(() => { Sync.lastMsg = Date.now(); }, 300);
+      await updCheck(false); Upd.lastInput = 0; await W(1700); eq(n(), 0, 'com a sincronização a trocar dados, a atualização espera');
+      clearInterval(keep); Sync.lastMsg = Date.now() - 6000; await W(1700); eq(n(), 1, 'acabada a troca, atualiza'); });
+    // a versão vai na mensagem de apresentação, e a do outro fica registada (as versões antigas ignoram o campo)
+    const pr = {id:'d'.repeat(20), secret:b64(randBytes(32)), name:'Tablet'}; Sync.cfg.pairs = [pr]; const sent = [], L = {pr, conn:{send:x => sent.push(x)}, nonce:'n1'};
+    const real = window.updCheck; let calls = 0; window.updCheck = () => { calls++; return Promise.resolve(); };
+    try {
+      await syncOnData(L, {t:'hi', nonce:'abc', boot:'x', ver:'99.1.0'}); ok(sent.some(m => m.t === 'proof'), 'a apresentação continua a funcionar'); eq([L.ver, pr.ver], ['99.1.0', '99.1.0']); eq(calls, 1, 'o outro tem uma versão mais recente: procura já');
+      await syncOnData(L, {t:'hi', nonce:'abc', ver:'0.1'}); eq(calls, 1, 'mais antiga: não procura'); await syncOnData(L, {t:'hi', nonce:'abc'}); eq(L.ver, '0.1', 'sem versão (uma ferramenta antiga): fica como estava');
+      await syncOnData(L, {t:'hi', nonce:'abc', ver:'<img>'}); eq(L.ver, '0.1', 'versão inválida ignorada');
+      setTab('settings'); await W(20); ok($('.sync-card .sync-ver') && $('.sync-card .sync-ver').textContent === 'versão 0.1', 'nas Definições, a versão do outro dispositivo quando é diferente'); ok(tipFor($('.sync-card .sync-ver')));
+      pr.ver = Upd.cur; syncRefreshCard(); ok(!$('.sync-card .sync-ver'), 'na mesma versão, não se mostra');
+    } finally { window.updCheck = real; }
+    const src = await (await fetch('js/sync.js')).text(); ok(/t:'hi', nonce:L\.nonce, boot:Sync\.boot, ver:Upd\.cur/.test(src), 'a apresentação leva a versão');
+    ok(!/`Ligado, no projeto/.test(src), 'o estado «Ligado, no projeto…» passa pela tradução');
+    Sync.cfg.pairs = []; syncSave(); setTab('board'); fx(); });
+  await T('AF04 programa para PC: procura, descarrega e oferece «Reiniciar e atualizar»; onde não se pode substituir, diz como; fora do programa, nada aparece', async () => { fx();
+    setTab('settings'); await W(20); ok(!$('.upd-card .upd-shell'), 'no browser e no telemóvel, não há linha do programa para PC');
+    let installs = 0, checks = 0, push = null; const st = {state:'idle'};
+    window.narrativaDesktop = {version:Upd.cur, platform:'win32', shell:{check:async () => { checks++; return {state:'downloading', version:'99.0.0'}; }, state:async () => st, install:async () => { installs++; return true; }, on:fn => { push = fn; }}};
+    try {
+      renderAll(); await W(20); ok($('.upd-card .upd-shell') && $('.upd-card .upd-shell').textContent.includes('Programa para PC: ' + Upd.cur), 'mostra a versão do programa');
+      await withRemote(Upd.cur, async () => { btn('Procurar atualizações', $('.upd-card')).click(); await W(60); });
+      eq(checks, 1, 'o botão também procura uma versão nova do programa'); ok($('.upd-card .upd-shell').textContent.includes('A descarregar a versão 99.0.0 do programa'));
+      Upd.shell = {state:'ready', version:'99.0.0'}; updUI(); const b = btn('Reiniciar e atualizar o programa', $('.upd-card')); ok(b && tipFor(b), 'pronta: «Reiniciar e atualizar o programa»');
+      ok($('.upd-card .upd-shell').textContent.includes('é instalada quando fechar a aplicação, sem perder nada')); b.click(); eq(installs, 1);
+      Upd.shell = {state:'current'}; updUI(); ok($('.upd-card .upd-shell').textContent.includes('O programa está atualizado.'));
+      Upd.shell = {state:'error'}; updUI(); ok($('.upd-card .upd-shell').textContent.includes('continua a atualizar-se pelo site'), 'erro: a ferramenta continua a atualizar-se');
+      window.narrativaDesktop.version = '0.9.0'; Upd.shell = {state:'unsupported'}; updUI(); const link = $('.upd-card .upd-shell a');
+      ok($('.upd-card .upd-shell').textContent.includes('não se substitui sozinho') && link && /releases\/latest$/.test(link.href) && link.target === '_blank' && tipFor(link), 'versão portátil, macOS ou .tar.gz desatualizado: explica e leva à página das versões');
+      window.narrativaDesktop.version = Upd.cur; updUI(); ok(!$('.upd-card .upd-shell a'), 'atualizado: sem a ligação'); eq($('.upd-card .upd-shell').textContent.trim(), 'Programa para PC: ' + Upd.cur);
+      updSet({onStart:false}); checks = 0; await withRemote(Upd.cur, async () => { await updCheck(false); }); eq(checks, 0, 'com a procura ao iniciar desligada, o programa também não procura sozinho');
+      updSet({onStart:true}); await withRemote(Upd.cur, async () => { await updCheck(false); }); eq(checks, 1, 'ligada, procura');
+    } finally { delete window.narrativaDesktop; Upd.shell = null; localStorage.removeItem(LS_UPD); }
+    setTab('board'); fx(); });
   reset(); try { await Promise.race([idb.clear(), W(5000)]); } catch (e) {}
   const failed = R.filter(r => !r.ok);
   return { total:R.length, passed:R.length - failed.length, failed, uncaught:errs, perf };

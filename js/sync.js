@@ -209,9 +209,9 @@ function syncWire(conn, pr, outgoing){
     } else if (cur.initiator < initiator){ conn.on('open', () => conn.close()); return null; } // ligaram-se os dois ao mesmo tempo: fica a do identificador menor
     else { cur.dropped = true; try { cur.conn.close(); } catch(e){} Sync.links.set(pr.id, L); }
   } else Sync.links.set(pr.id, L);
-  conn.on('open', () => conn.send({t:'hi', nonce:L.nonce, boot:Sync.boot}));
+  conn.on('open', () => conn.send({t:'hi', nonce:L.nonce, boot:Sync.boot, ver:Upd.cur})); // a versão: as anteriores ignoram-na
   // as mensagens são tratadas uma de cada vez, pela ordem em que chegam
-  conn.on('data', d => { L.q = L.q.then(() => syncOnData(L, d)).catch(e => console.error(e)); });
+  conn.on('data', d => { Sync.lastMsg = Date.now(); L.q = L.q.then(() => syncOnData(L, d)).catch(e => console.error(e)); });
   conn.on('close', () => syncClosed(L));
   conn.on('error', () => syncClosed(L));
   return L;
@@ -229,11 +229,22 @@ function syncDropLink(id, tell){
   setTimeout(() => { try { L.conn.close(); } catch(e){} }, 300);
 }
 
+/* a versão do outro dispositivo (para a mostrar e para procurar logo uma atualização se a dele for mais recente).
+   Versões diferentes sincronizam como sempre: o projeto vai inteiro e passa pela mesma reparação de qualquer ficheiro. */
+function syncPeerVersion(L, v){
+  if (typeof v !== 'string' || !/^\d+(\.\d+){0,3}$/.test(v)) return;
+  L.ver = v; if (L.pr.ver !== v){ L.pr.ver = v; syncSave(); syncUI(); }
+  if (typeof updCheck === 'function' && verCmp(v, Upd.cur) > 0 && updCfg().onStart && Upd.state !== 'ready') updCheck(false);
+}
+/* a meio de uma troca de dados (envio por fazer, mensagens a chegar, versões por escolher ou um projeto a receber):
+   a ferramenta não se atualiza (recarrega) nesse momento */
+const syncBusy = () => !!Sync.sendT || Date.now() - (Sync.lastMsg || 0) < 5000 || [...Sync.links.values()].some(L => L.conflict || L.want);
+
 /* ---------- mensagens ---------- */
 async function syncOnData(L, d){
   if (!d || typeof d !== 'object' || L.dropped) return;
   const pr = L.pr;
-  if (d.t === 'hi' && typeof d.nonce === 'string'){ if (typeof d.boot === 'string') L.boot = d.boot; L.conn.send({t:'proof', mac:await hmac(pr.secret, d.nonce + '|' + Sync.cfg.id)}); return; }
+  if (d.t === 'hi' && typeof d.nonce === 'string'){ if (typeof d.boot === 'string') L.boot = d.boot; syncPeerVersion(L, d.ver); L.conn.send({t:'proof', mac:await hmac(pr.secret, d.nonce + '|' + Sync.cfg.id)}); return; }
   if (d.t === 'proof'){
     if (typeof d.mac !== 'string' || d.mac !== await hmac(pr.secret, L.nonce + '|' + pr.id)){ L.dropped = true; L.conn.close(); return; } // não conhece a chave
     const old = Sync.links.get(pr.id);
@@ -326,6 +337,7 @@ function syncLocalChanged(){
   if (!Sync.peer) return; // só a janela que sincroniza envia
   clearTimeout(Sync.sendT);
   Sync.sendT = setTimeout(() => {
+    Sync.sendT = null; // enviado: deixa de haver um envio por fazer
     const rs = lsGet(LS_RESET), reset = rs !== Sync.sentReset; Sync.sentReset = rs; // projeto importado ou novo: os outros recomeçam o histórico
     syncRelay(null, reset);
   }, 500);
@@ -337,7 +349,7 @@ async function syncRelay(from, reset){
 }
 /* este dispositivo mudou de projeto (ou abriu / fechou um): recomeça a conversa com cada dispositivo ligado */
 function syncProjectChanged(){
-  clearTimeout(Sync.sendT);
+  clearTimeout(Sync.sendT); Sync.sendT = null;
   for (const L of Sync.links.values()) if (L.authed){ L.synced = false; L.unresolved = null; L.chose = L.winner = null; L.other = null; if (L.conflict) L.conflict.close(); syncSendHead(L); }
   syncUI();
 }
@@ -520,7 +532,8 @@ function syncCard(){
     c.pairs.length ? h('div', {class:'sync-list'}, c.pairs.map(p => { const L = linkOf(p.id);
       return h('div', {class:'list-row'}, h('span', {class:'sync-dot' + (L ? ' on' : ''), 'aria-hidden':'true'}),
         h('span', {class:'sync-name'}, p.name),
-        h('span', {class:'muted small'}, L && L.other ? (L.other.pid ? `Ligado, no projeto «${L.other.name}»` : _('Ligado, sem nenhum projeto aberto')) : L && L.unresolved ? _('Versões diferentes por resolver') : L ? _('Ligado agora') : p.at ? _('Última ligação: ') + hhmm(p.at) : _('Ainda não sincronizou')),
+        p.ver && verCmp(p.ver, Upd.cur) !== 0 ? h('span', {class:'muted small sync-ver', title:_('Versões diferentes sincronizam na mesma; a mais antiga atualiza-se sozinha quando procurar atualizações.')}, _('versão {a}', {a:p.ver})) : null, // o outro dispositivo está noutra versão
+        h('span', {class:'muted small'}, L && L.other ? (L.other.pid ? _('Ligado, no projeto «{nome}»', {nome:L.other.name}) : _('Ligado, sem nenhum projeto aberto')) : L && L.unresolved ? _('Versões diferentes por resolver') : L ? _('Ligado agora') : p.at ? _('Última ligação: ') + hhmm(p.at) : _('Ainda não sincronizou')),
         L && L.unresolved && !L.conflict ? h('button', {class:'btn small primary', onclick:() => syncConflictDialog(L)}, _('Escolher a versão')) : null,
         L && L.other ? syncOtherButton(L) : null,
         h('button', {class:'btn small', onclick:async () => { if (await confirmDialog(_('Deixar de sincronizar com «{nome}»? O projeto fica como está nos dois dispositivos.', {nome:p.name}), {title:_('Deixar de sincronizar'), ok:_('Deixar de sincronizar'), keep:true})) syncForget(p.id, true); }}, _('Deixar de sincronizar'))); }))

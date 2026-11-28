@@ -1,8 +1,9 @@
 'use strict';
 /* ===== Atualizações automáticas =====
-   A app instalada (Windows, macOS, Linux, Android, iPhone e iPad) é a mesma: uma app web instalada pelo browser.
-   Não há instalador para correr de novo: a ferramenta procura a versão publicada no site ao abrir, de 30 em 30 minutos e ao
-   voltar a ela; quando há uma mais recente, descarrega-a e — com «Instalar atualizações automaticamente» ligado — aplica-a
+   A ferramenta é a mesma em todo o lado: no browser, instalada pelo browser (Android, iPhone, iPad, PC) e dentro do programa
+   para PC, que a abre a partir do site. Não há instalador para correr de novo: com «Procurar sempre atualizações ao iniciar»
+   (ligada por omissão), procura a versão publicada no site ao abrir, de 30 em 30 minutos e ao voltar a ela; desligada, só
+   quando se carrega em «Procurar atualizações»; quando há uma mais recente, descarrega-a e — com «Instalar atualizações automaticamente» ligado — aplica-a
    num momento em que não se esteja a fazer nada (projeto gravado, sem janelas abertas, nada a ser escrito ou arrastado).
    Com a opção desligada, aparece «Atualizar» na barra de topo e é o utilizador quem escolhe o momento. */
 const LS_UPD = 'narrativa.update', SS_UPDATED = 'narrativa.updated';
@@ -24,7 +25,7 @@ function parseRelease(t){
 function updCfg(){
   let c = null; try { c = JSON.parse(lsGet(LS_UPD)); } catch(e){}
   c = c && typeof c === 'object' ? c : {};
-  return { auto:c.auto !== false, tried:typeof c.tried === 'string' ? c.tried : null, triedAt:Number(c.triedAt) || 0, checkedAt:Number(c.checkedAt) || 0 };
+  return { auto:c.auto !== false, onStart:c.onStart !== false, tried:typeof c.tried === 'string' ? c.tried : null, triedAt:Number(c.triedAt) || 0, checkedAt:Number(c.checkedAt) || 0 };
 }
 const updSet = o => lsSet(LS_UPD, JSON.stringify(Object.assign(updCfg(), o)));
 /* uma atualização já tentada há menos de uma hora, que não chegou (o site ainda a estava a publicar, por exemplo): não se recarrega outra vez */
@@ -33,6 +34,7 @@ const updBlocked = () => { const c = updCfg(); return c.tried === Upd.remote && 
 async function updCheck(manual){
   if (!/^https?:$/.test(location.protocol) || Dual.role === 'second') return;
   if (navigator.onLine === false){ if (manual) toast(_('Sem ligação à internet. A procura de atualizações retoma quando a ligação voltar.')); return; }
+  if (manual || updCfg().onStart) shellCheck(); // o próprio programa para PC, onde se pode atualizar sozinho
   if (Upd.state === 'checking') return;
   Upd.state = 'checking'; updUI();
   let rel = null;
@@ -62,6 +64,7 @@ async function updPrepare(){
 function updSafe(){
   const a = document.activeElement;
   return !drag && !linkDrag && !pickLink && !openModals.length && !Tour.active && !document.querySelector('.ctx-menu')
+    && !(typeof syncBusy === 'function' && syncBusy()) // nunca a meio de uma troca de dados com outro dispositivo
     && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) && !(a && a.isContentEditable)
     && (Upd.hidden() || Date.now() - Upd.lastInput > UPD_IDLE);
 }
@@ -78,6 +81,23 @@ function updApply(){
   ssSet(SS_UPDATED, Upd.remote);
   Upd.state = 'applying'; updUI();
   Upd.reload();
+}
+
+/* ---------- o programa para PC ----------
+   Só existe dentro do programa para PC (preload.js): procura, descarrega e instala ao fechar uma versão nova do próprio
+   programa, onde isso é possível sem voltar a instalar (instalador do Windows, AppImage do Linux). */
+const desk = () => (typeof window !== 'undefined' && window.narrativaDesktop && window.narrativaDesktop.shell) || null;
+function shellCheck(){ const d = desk(); if (!d || navigator.onLine === false) return; d.check().then(st => { Upd.shell = st; updUI(); }, () => {}); }
+function shellRow(){
+  const d = desk(); if (!d) return null;
+  const st = Upd.shell || {state:'idle'}, v = window.narrativaDesktop.version || '?', old = verCmp(v, Upd.cur) < 0;
+  const txt = {checking:_('A procurar uma versão nova do programa…'), current:_('O programa está atualizado.'), downloading:_('A descarregar a versão {a} do programa…', {a:st.version || ''}),
+    ready:_('A versão {a} do programa está pronta: é instalada quando fechar a aplicação, sem perder nada.', {a:st.version || ''}),
+    error:_('Não foi possível procurar uma versão nova do programa. A ferramenta continua a atualizar-se pelo site.'),
+    unsupported:old ? _('Neste formato (versão portátil, macOS ou .tar.gz), o programa não se substitui sozinho; a ferramenta continua a atualizar-se pelo site. Para atualizar também o programa, descarregue a versão nova na página das versões.') : '', idle:''}[st.state] || '';
+  return h('div', {class:'upd-shell'}, h('p', {class:'small'}, h('b', null, _('Programa para PC: ')), v, txt ? h('span', {class:'muted'}, ' · ' + txt) : null),
+    st.state === 'ready' ? h('button', {class:'btn small primary', onclick:() => d.install()}, _('Reiniciar e atualizar o programa')) : null,
+    st.state === 'unsupported' && old ? h('a', {class:'btn small', href:'https://github.com/HVS87/narrative/releases/latest', target:'_blank', rel:'noopener'}, _('Página das versões')) : null);
 }
 
 /* ---------- interface ---------- */
@@ -99,19 +119,25 @@ function updUI(){
 function updCard(){
   const c = updCfg();
   const el = h('div', {class:'card static upd-card'}, h('h3', null, _('Atualizações')),
-    h('p', {class:'muted small'}, _('A ferramenta procura sozinha versões novas no site — ao abrir, de 30 em 30 minutos e quando volta a ela — e instala-as sem ser preciso desinstalar nem voltar a instalar, no PC (Windows, macOS, Linux), no telemóvel e no tablet (Android, iPhone, iPad). O projeto não é alterado.')),
+    h('p', {class:'muted small'}, _('As versões novas instalam-se sem ser preciso desinstalar nem voltar a instalar, no PC (Windows, macOS, Linux), no telemóvel e no tablet (Android, iPhone, iPad). Os projetos, as preferências e a sincronização entre dispositivos ficam como estão.')),
     h('p', {class:'small'}, h('b', null, _('Versão instalada: ')), Upd.cur + (Upd.date ? ` (${new Date(Upd.date + 'T12:00').toLocaleDateString(LOCALE, {day:'numeric', month:'long', year:'numeric'})})` : ''),
       c.checkedAt ? h('span', {class:'muted'}, _(' · última procura: {a}', {a:new Date(c.checkedAt).toLocaleString(LOCALE, {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})})) : null),
+    h('label', {class:'switch-wrap upd-onstart'}, h('input', {type:'checkbox', checked:c.onStart, onchange:e => { updSet({onStart:e.target.checked}); if (e.target.checked) updCheck(false); updUI(); }}),
+      h('span', {class:'slider'}), h('span', null, _('Procurar sempre atualizações ao iniciar'))),
+    h('p', {class:'muted small upd-hint'}, c.onStart ? _('Procura ao abrir, de 30 em 30 minutos e quando volta à ferramenta.') : _('Só procura quando carregar em «Procurar atualizações».')),
     h('label', {class:'switch-wrap'}, h('input', {type:'checkbox', checked:c.auto, onchange:e => { updSet({auto:e.target.checked}); if (e.target.checked && Upd.state === 'ready') updWhenSafe(); else clearInterval(Upd.waitI); updUI(); }}),
       h('span', {class:'slider'}), h('span', null, _('Instalar atualizações automaticamente'))),
     h('p', {class:'small upd-state', role:'status'}, updStatusText(), Upd.notes && Upd.remote ? h('span', {class:'muted'}, _(' Novidades: ') + Upd.notes) : null),
     h('div', {class:'chips'}, h('button', {class:'btn', disabled:Upd.state === 'checking' || Upd.state === 'applying', onclick:() => updCheck(true)}, _('Procurar atualizações')),
-      Upd.state === 'ready' ? h('button', {class:'btn primary', onclick:updApply}, _('Atualizar agora')) : null));
+      Upd.state === 'ready' ? h('button', {class:'btn primary', onclick:updApply}, _('Atualizar agora')) : null),
+    shellRow());
   Upd.cardEl = el;
   return el;
 }
 
 /* ---------- arranque ---------- */
+/* as procuras automáticas (ao abrir, de 30 em 30 minutos, ao voltar e quando a internet volta): só com a opção ligada */
+function updAutoCheck(){ if (updCfg().onStart) updCheck(false); }
 function initUpdate(){
   const done = ssGet(SS_UPDATED);
   if (done){
@@ -120,13 +146,15 @@ function initUpdate(){
   }
   ['pointerdown', 'keydown', 'wheel'].forEach(t => window.addEventListener(t, () => { Upd.lastInput = Date.now(); }, {capture:true, passive:true}));
   $('#updBtn').addEventListener('click', updApply);
-  setTimeout(() => updCheck(false), 4000);
-  setInterval(() => updCheck(false), UPD_EVERY);
+  const d = desk(); if (d){ d.on(st => { Upd.shell = st; updUI(); }); d.state().then(st => { Upd.shell = st; updUI(); }, () => {}); }
+  /* com «Procurar sempre atualizações ao iniciar» desligada, só se procura pelo botão das Definições */
+  setTimeout(updAutoCheck, 4000);
+  setInterval(updAutoCheck, UPD_EVERY);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden){ if (Upd.state === 'ready' && updCfg().auto && !updBlocked()) updWhenSafe(); return; } // quem não está a olhar não é interrompido
-    if (Date.now() - updCfg().checkedAt > 10 * 60000) updCheck(false);
+    if (Date.now() - updCfg().checkedAt > 10 * 60000) updAutoCheck();
   });
-  window.addEventListener('online', () => updCheck(false));
+  window.addEventListener('online', updAutoCheck);
   updUI();
 }
 window.addEventListener('DOMContentLoaded', initUpdate);

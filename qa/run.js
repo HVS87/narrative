@@ -64,7 +64,7 @@ function runOne(name){
     const done = r => { clearTimeout(t); onReport = null;
       try { execSync(`taskkill /PID ${child.pid} /T /F`, {stdio:'ignore'}); } catch (e) {}
       setTimeout(() => { removeProfile(prof); resolve(Object.assign({name, secs:Math.round((Date.now() - started) / 1000)}, r)); }, 1500); };
-    const t = setTimeout(() => done({error:'sem resposta em 240 s; último sinal: ' + lastPing + (Date.now() - lastPingAt < 5000 ? ' (página viva, à espera)' : ' (página parada há ' + Math.round((Date.now() - lastPingAt) / 1000) + ' s)')}), 240000);
+    const t = setTimeout(() => done({error:'sem resposta em 480 s; último sinal: ' + lastPing + (Date.now() - lastPingAt < 5000 ? ' (página viva, à espera)' : ' (página parada há ' + Math.round((Date.now() - lastPingAt) / 1000) + ' s)')}), 480000); // a suite inteira, num browser lento
     onReport = done;
   });
 }
